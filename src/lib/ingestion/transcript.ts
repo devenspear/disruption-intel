@@ -38,19 +38,59 @@ export async function fetchTranscriptWithDebug(videoId: string): Promise<Transcr
     itemCount: null,
     errorType: null,
     errorMessage: null,
-    method: "python-local",
+    method: "api",
   }
 
   console.log(`[Transcript] Starting fetch for video: ${videoId}`)
 
   try {
-    // Use Python subprocess for transcript fetching
-    // This works locally and on platforms that support Python
+    // Try external transcript service first (Railway/etc)
+    const transcriptServiceUrl = process.env.TRANSCRIPT_SERVICE_URL
+
+    if (transcriptServiceUrl) {
+      console.log(`[Transcript] Using external service: ${transcriptServiceUrl}`)
+      debug.method = "external-api"
+
+      try {
+        const response = await fetch(`${transcriptServiceUrl}/transcript?videoId=${encodeURIComponent(videoId)}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        })
+
+        const result = await response.json()
+
+        if (result.success) {
+          debug.itemCount = result.segments?.length ?? 0
+          console.log(`[Transcript] Success! ${result.wordCount} words, ${debug.itemCount} segments`)
+
+          return {
+            success: true,
+            data: {
+              fullText: result.fullText,
+              segments: result.segments,
+              language: result.language || "en",
+              source: "youtube_auto",
+              wordCount: result.wordCount,
+            },
+            error: null,
+            debug,
+          }
+        } else {
+          console.log(`[Transcript] External service error: ${result.error}`)
+          // Fall through to Python fallback
+        }
+      } catch (apiError) {
+        console.log(`[Transcript] External service failed: ${apiError}`)
+        // Fall through to Python fallback
+      }
+    }
+
+    // Fallback: Use Python subprocess (works locally)
+    debug.method = "python-local"
     const { exec } = await import("child_process")
     const { promisify } = await import("util")
     const execAsync = promisify(exec)
 
-    // Try multiple Python paths
     const pythonPaths = [
       process.env.PYTHON_PATH,
       `${process.cwd()}/.venv/bin/python3`,
@@ -81,16 +121,15 @@ export async function fetchTranscriptWithDebug(videoId: string): Promise<Transcr
     }
 
     if (!result) {
-      // Python not available - provide helpful error
-      debug.errorType = "PythonNotAvailable"
-      debug.errorMessage = "Transcript fetching requires Python. YouTube blocks server-side requests from npm packages."
+      debug.errorType = "TranscriptUnavailable"
+      debug.errorMessage = "Transcript service not configured. Set TRANSCRIPT_SERVICE_URL environment variable."
 
-      console.log(`[Transcript] Python not available: ${lastError}`)
+      console.log(`[Transcript] No transcript service available: ${lastError}`)
 
       return {
         success: false,
         data: null,
-        error: "Automatic transcript fetching is temporarily unavailable. Please try again later or contact support.",
+        error: "Transcript fetching unavailable. Please configure TRANSCRIPT_SERVICE_URL.",
         debug,
       }
     }
