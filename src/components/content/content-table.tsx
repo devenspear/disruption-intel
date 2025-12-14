@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { formatDistanceToNow } from "date-fns"
+import { format } from "date-fns"
 import {
   Table,
   TableBody,
@@ -19,7 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { MoreHorizontal, ExternalLink, Brain, Archive, Trash2, Video, Mic } from "lucide-react"
-import { format } from "date-fns"
 
 // Content type icon component
 function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: string }) {
@@ -34,27 +33,6 @@ function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: stri
   return (
     <span title="Video">
       <Video className="h-4 w-4 text-red-500 flex-shrink-0" />
-    </span>
-  )
-}
-
-// Transcript source badge component
-function TranscriptSourceBadge({ source }: { source?: string }) {
-  if (!source) return null
-
-  const sourceLabels: Record<string, { label: string; color: string }> = {
-    youtube_auto: { label: "YouTube", color: "bg-red-100 text-red-700" },
-    podcast_rss: { label: "RSS", color: "bg-green-100 text-green-700" },
-    podcast_scraped: { label: "Scraped", color: "bg-yellow-100 text-yellow-700" },
-    youtube_fallback: { label: "YT Fallback", color: "bg-orange-100 text-orange-700" },
-    manual: { label: "Manual", color: "bg-blue-100 text-blue-700" },
-  }
-
-  const config = sourceLabels[source] || { label: source, color: "bg-gray-100 text-gray-700" }
-
-  return (
-    <span className={`text-xs px-1.5 py-0.5 rounded ${config.color}`} title={`Transcript source: ${source}`}>
-      {config.label}
     </span>
   )
 }
@@ -102,59 +80,57 @@ const statusColors: Record<string, string> = {
 
 export function ContentTable({ contents, onAnalyze, onArchive, onDelete }: ContentTableProps) {
   return (
-    <Table className="min-w-[900px]">
+    <Table className="w-full table-fixed">
       <TableHeader>
         <TableRow>
           <TableHead className="w-[50px]">Type</TableHead>
-          <TableHead className="min-w-[300px]">Title</TableHead>
-          <TableHead className="w-[120px]">Source</TableHead>
+          <TableHead>Title</TableHead>
+          <TableHead className="w-[100px]">Source</TableHead>
           <TableHead className="w-[100px]">Status</TableHead>
-          <TableHead className="w-[100px]">Words</TableHead>
-          <TableHead className="w-[80px]">Score</TableHead>
-          <TableHead className="w-[120px]">Published</TableHead>
+          <TableHead className="w-[80px]">Words</TableHead>
+          <TableHead className="w-[70px]">Score</TableHead>
+          <TableHead className="w-[100px]">Published</TableHead>
           <TableHead className="w-[50px]"></TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {contents.map((content) => (
           <TableRow key={content.id}>
-            <TableCell>
+            <TableCell className="w-[50px]">
               <ContentTypeIcon type={content.contentType} sourceType={content.source.type} />
             </TableCell>
-            <TableCell>
+            <TableCell className="max-w-0">
               <Link
                 href={`/content/${content.id}`}
-                className="font-medium hover:underline line-clamp-2"
+                className="font-medium hover:underline truncate block"
+                title={content.title}
               >
                 {content.title}
               </Link>
             </TableCell>
-            <TableCell>
-              <Badge variant="outline">{content.source.name}</Badge>
+            <TableCell className="w-[100px]">
+              <Badge variant="outline" className="truncate max-w-full">{content.source.name}</Badge>
             </TableCell>
-            <TableCell>
+            <TableCell className="w-[100px]">
               <Badge className={statusColors[content.status]}>
                 {content.status}
               </Badge>
             </TableCell>
-            <TableCell>
-              <div className="flex items-center gap-1.5">
-                <span>{content.transcript?.wordCount?.toLocaleString() || "-"}</span>
-                <TranscriptSourceBadge source={content.transcript?.source} />
-              </div>
+            <TableCell className="w-[80px]">
+              <span className="text-sm">{content.transcript?.wordCount?.toLocaleString() || "-"}</span>
             </TableCell>
-            <TableCell>
+            <TableCell className="w-[70px]">
               {content.analyses[0]?.relevanceScore
                 ? `${(content.analyses[0].relevanceScore * 100).toFixed(0)}%`
                 : "-"}
             </TableCell>
-            <TableCell>
-              {format(new Date(content.publishedAt), "MMM d, yyyy")}
+            <TableCell className="w-[100px] text-sm">
+              {format(new Date(content.publishedAt), "MMM d, yy")}
             </TableCell>
-            <TableCell>
+            <TableCell className="w-[50px]">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="h-8 w-8">
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
