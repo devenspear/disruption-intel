@@ -1,5 +1,3 @@
-import { YoutubeTranscript } from "youtube-transcript"
-
 export interface TranscriptSegment {
   start: number
   duration: number
@@ -24,7 +22,7 @@ export interface TranscriptFetchResult {
     itemCount: number | null
     errorType: string | null
     errorMessage: string | null
-    errorStack: string | null
+    method: string
   }
 }
 
@@ -40,48 +38,75 @@ export async function fetchTranscriptWithDebug(videoId: string): Promise<Transcr
     itemCount: null,
     errorType: null,
     errorMessage: null,
-    errorStack: null,
+    method: "python-api",
   }
 
   console.log(`[Transcript] Starting fetch for video: ${videoId}`)
 
   try {
-    console.log(`[Transcript] Calling YoutubeTranscript.fetchTranscript...`)
-    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
+    // Call the Python serverless function for transcript fetching
+    // In production: /api/transcript, In development: use Python subprocess
+    const isDev = process.env.NODE_ENV === "development"
+    let result
 
-    debug.itemCount = transcriptItems?.length ?? 0
-    console.log(`[Transcript] Received ${debug.itemCount} transcript items`)
+    if (isDev && process.env.USE_LOCAL_PYTHON === "true") {
+      // Development mode with local Python
+      const { exec } = await import("child_process")
+      const { promisify } = await import("util")
+      const execAsync = promisify(exec)
 
-    if (!transcriptItems || transcriptItems.length === 0) {
-      console.log(`[Transcript] No transcript items found for ${videoId}`)
+      const pythonPath = process.env.PYTHON_PATH || "python3"
+      const scriptPath = `${process.cwd()}/scripts/fetch-transcript.py`
+
+      console.log(`[Transcript] Using local Python: ${pythonPath}`)
+
+      const { stdout } = await execAsync(
+        `${pythonPath} "${scriptPath}" "${videoId}"`,
+        { timeout: 30000, cwd: process.cwd() }
+      )
+
+      result = JSON.parse(stdout)
+    } else {
+      // Production mode: call the Python API endpoint
+      const baseUrl = process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.NEXTAUTH_URL || "http://localhost:3000"
+
+      const apiUrl = `${baseUrl}/api/transcript?videoId=${encodeURIComponent(videoId)}`
+      console.log(`[Transcript] Calling API: ${apiUrl}`)
+
+      const response = await fetch(apiUrl, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      result = await response.json()
+    }
+
+    if (!result.success) {
+      debug.errorType = result.errorType || "FetchError"
+      debug.errorMessage = result.error || "Unknown error"
+      console.log(`[Transcript] API returned error: ${debug.errorMessage}`)
+
       return {
         success: false,
         data: null,
-        error: "No transcript available for this video",
+        error: debug.errorMessage,
         debug,
       }
     }
 
-    console.log(`[Transcript] Processing ${transcriptItems.length} segments...`)
-    const segments: TranscriptSegment[] = transcriptItems.map((item) => ({
-      start: item.offset / 1000,
-      duration: item.duration / 1000,
-      text: item.text,
-    }))
-
-    const fullText = segments.map((s) => s.text).join(" ")
-    const wordCount = fullText.split(/\s+/).filter(Boolean).length
-
-    console.log(`[Transcript] Success! ${wordCount} words, ${segments.length} segments`)
+    debug.itemCount = result.segments?.length ?? 0
+    console.log(`[Transcript] Success! ${result.wordCount} words, ${debug.itemCount} segments`)
 
     return {
       success: true,
       data: {
-        fullText,
-        segments,
-        language: "en",
+        fullText: result.fullText,
+        segments: result.segments,
+        language: result.language || "en",
         source: "youtube_auto",
-        wordCount,
+        wordCount: result.wordCount,
       },
       error: null,
       debug,
@@ -90,12 +115,10 @@ export async function fetchTranscriptWithDebug(videoId: string): Promise<Transcr
     const err = error as Error
     debug.errorType = err.name || "UnknownError"
     debug.errorMessage = err.message || "Unknown error occurred"
-    debug.errorStack = err.stack || null
 
     console.error(`[Transcript] ERROR for ${videoId}:`, {
       type: debug.errorType,
       message: debug.errorMessage,
-      stack: debug.errorStack,
     })
 
     return {
