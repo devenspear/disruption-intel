@@ -40,6 +40,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "use-debounce": "^10.0.6",
+    "youtube-sr": "^4.3.12",
     "youtube-transcript": "^1.2.1",
     "zod": "^4.1.13"
   },

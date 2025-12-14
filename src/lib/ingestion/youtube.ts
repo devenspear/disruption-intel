@@ -1,7 +1,4 @@
-import { exec } from "child_process"
-import { promisify } from "util"
-
-const execAsync = promisify(exec)
+import YouTube from "youtube-sr"
 
 export interface YouTubeVideo {
   id: string
@@ -29,31 +26,31 @@ export interface TranscriptResult {
 
 export async function getChannelVideos(channelUrl: string, limit: number = 10): Promise<YouTubeVideo[]> {
   try {
-    const { stdout } = await execAsync(
-      `yt-dlp --flat-playlist --dump-json --playlist-end ${limit} "${channelUrl}"`,
-      { maxBuffer: 1024 * 1024 * 10 }
-    )
+    // Extract channel identifier from URL
+    const channelMatch = channelUrl.match(/youtube\.com\/@([^\/]+)/) ||
+                         channelUrl.match(/youtube\.com\/channel\/([^\/]+)/) ||
+                         channelUrl.match(/youtube\.com\/c\/([^\/]+)/)
 
-    const videos: YouTubeVideo[] = []
-    const lines = stdout.trim().split("\n")
-
-    for (const line of lines) {
-      try {
-        const data = JSON.parse(line)
-        videos.push({
-          id: data.id,
-          title: data.title,
-          description: data.description || "",
-          publishedAt: new Date(data.upload_date?.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3") || Date.now()),
-          duration: data.duration || 0,
-          thumbnailUrl: data.thumbnail || `https://img.youtube.com/vi/${data.id}/maxresdefault.jpg`,
-          channelId: data.channel_id || "",
-          channelTitle: data.channel || "",
-        })
-      } catch {
-        continue
-      }
+    if (!channelMatch) {
+      throw new Error("Invalid YouTube channel URL")
     }
+
+    const channelIdentifier = channelMatch[1]
+
+    // Search for videos from this channel
+    const searchQuery = `${channelIdentifier}`
+    const results = await YouTube.search(searchQuery, { type: "video", limit: limit })
+
+    const videos: YouTubeVideo[] = results.map((video) => ({
+      id: video.id || "",
+      title: video.title || "Untitled",
+      description: video.description || "",
+      publishedAt: video.uploadedAt ? new Date(video.uploadedAt) : new Date(),
+      duration: video.duration || 0,
+      thumbnailUrl: video.thumbnail?.url || `https://img.youtube.com/vi/${video.id}/maxresdefault.jpg`,
+      channelId: video.channel?.id || "",
+      channelTitle: video.channel?.name || "",
+    }))
 
     return videos
   } catch (error) {
@@ -62,101 +59,21 @@ export async function getChannelVideos(channelUrl: string, limit: number = 10): 
   }
 }
 
-export async function getVideoTranscript(videoId: string): Promise<TranscriptResult | null> {
-  try {
-    // Try to get auto-generated captions first
-    const { stdout } = await execAsync(
-      `yt-dlp --skip-download --write-auto-sub --sub-lang en --sub-format json3 -o "%(id)s" --print-json "https://www.youtube.com/watch?v=${videoId}"`,
-      { maxBuffer: 1024 * 1024 * 50 }
-    )
-
-    // Parse the subtitle file
-    const subtitlePath = `${videoId}.en.json3`
-    const fs = await import("fs/promises")
-
-    try {
-      const subtitleContent = await fs.readFile(subtitlePath, "utf-8")
-      const subtitleData = JSON.parse(subtitleContent)
-
-      const segments: TranscriptSegment[] = []
-      let fullText = ""
-
-      for (const event of subtitleData.events || []) {
-        if (event.segs) {
-          const text = event.segs.map((s: { utf8?: string }) => s.utf8 || "").join("")
-          if (text.trim()) {
-            segments.push({
-              start: event.tStartMs / 1000,
-              end: (event.tStartMs + (event.dDurationMs || 0)) / 1000,
-              text: text.trim(),
-            })
-            fullText += text + " "
-          }
-        }
-      }
-
-      // Clean up subtitle file
-      await fs.unlink(subtitlePath).catch(() => {})
-
-      return {
-        fullText: fullText.trim(),
-        segments,
-        language: "en",
-        source: "youtube_auto",
-      }
-    } catch {
-      // Subtitle file not found, try alternative method
-      return await getTranscriptViaAPI(videoId)
-    }
-  } catch (error) {
-    console.error("Failed to get video transcript:", error)
-    return null
-  }
-}
-
-async function getTranscriptViaAPI(videoId: string): Promise<TranscriptResult | null> {
-  try {
-    // Use youtube-transcript-api via a simple fetch approach
-    const response = await fetch(
-      `https://www.youtube.com/watch?v=${videoId}`,
-      { headers: { "Accept-Language": "en" } }
-    )
-
-    const html = await response.text()
-
-    // Extract captions URL from the page
-    const captionsMatch = html.match(/"captions":\s*({.*?"playerCaptionsTracklistRenderer".*?})/)
-
-    if (!captionsMatch) {
-      return null
-    }
-
-    // For now, return null if we can't get captions via yt-dlp
-    // A more robust implementation would parse the captions data
-    return null
-  } catch {
-    return null
-  }
-}
-
 export async function getVideoMetadata(videoId: string): Promise<YouTubeVideo | null> {
   try {
-    const { stdout } = await execAsync(
-      `yt-dlp --dump-json "https://www.youtube.com/watch?v=${videoId}"`,
-      { maxBuffer: 1024 * 1024 * 10 }
-    )
+    const video = await YouTube.getVideo(`https://www.youtube.com/watch?v=${videoId}`)
 
-    const data = JSON.parse(stdout)
+    if (!video) return null
 
     return {
-      id: data.id,
-      title: data.title,
-      description: data.description || "",
-      publishedAt: new Date(data.upload_date?.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3") || Date.now()),
-      duration: data.duration || 0,
-      thumbnailUrl: data.thumbnail || `https://img.youtube.com/vi/${data.id}/maxresdefault.jpg`,
-      channelId: data.channel_id || "",
-      channelTitle: data.channel || "",
+      id: video.id || videoId,
+      title: video.title || "Untitled",
+      description: video.description || "",
+      publishedAt: video.uploadedAt ? new Date(video.uploadedAt) : new Date(),
+      duration: video.duration || 0,
+      thumbnailUrl: video.thumbnail?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      channelId: video.channel?.id || "",
+      channelTitle: video.channel?.name || "",
     }
   } catch (error) {
     console.error("Failed to get video metadata:", error)
