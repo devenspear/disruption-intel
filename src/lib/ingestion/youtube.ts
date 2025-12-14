@@ -1,5 +1,51 @@
 import YouTube from "youtube-sr"
 
+function parseRelativeDate(relativeTime: string | undefined): Date {
+  if (!relativeTime) return new Date()
+
+  const now = new Date()
+  const lowerTime = relativeTime.toLowerCase()
+
+  // Try parsing as ISO date first
+  const isoDate = new Date(relativeTime)
+  if (!isNaN(isoDate.getTime())) {
+    return isoDate
+  }
+
+  // Parse relative time strings like "1 year ago", "3 months ago", etc.
+  const match = lowerTime.match(/(\d+)\s*(second|minute|hour|day|week|month|year)s?\s*ago/)
+  if (!match) return now
+
+  const amount = parseInt(match[1], 10)
+  const unit = match[2]
+
+  switch (unit) {
+    case "second":
+      now.setSeconds(now.getSeconds() - amount)
+      break
+    case "minute":
+      now.setMinutes(now.getMinutes() - amount)
+      break
+    case "hour":
+      now.setHours(now.getHours() - amount)
+      break
+    case "day":
+      now.setDate(now.getDate() - amount)
+      break
+    case "week":
+      now.setDate(now.getDate() - amount * 7)
+      break
+    case "month":
+      now.setMonth(now.getMonth() - amount)
+      break
+    case "year":
+      now.setFullYear(now.getFullYear() - amount)
+      break
+  }
+
+  return now
+}
+
 export interface YouTubeVideo {
   id: string
   title: string
@@ -45,7 +91,7 @@ export async function getChannelVideos(channelUrl: string, limit: number = 10): 
       id: video.id || "",
       title: video.title || "Untitled",
       description: video.description || "",
-      publishedAt: video.uploadedAt ? new Date(video.uploadedAt) : new Date(),
+      publishedAt: parseRelativeDate(video.uploadedAt),
       duration: video.duration || 0,
       thumbnailUrl: video.thumbnail?.url || `https://img.youtube.com/vi/${video.id}/maxresdefault.jpg`,
       channelId: video.channel?.id || "",
@@ -69,7 +115,7 @@ export async function getVideoMetadata(videoId: string): Promise<YouTubeVideo | 
       id: video.id || videoId,
       title: video.title || "Untitled",
       description: video.description || "",
-      publishedAt: video.uploadedAt ? new Date(video.uploadedAt) : new Date(),
+      publishedAt: parseRelativeDate(video.uploadedAt),
       duration: video.duration || 0,
       thumbnailUrl: video.thumbnail?.url || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
       channelId: video.channel?.id || "",
