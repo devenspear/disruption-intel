@@ -30,6 +30,8 @@ interface SourceCardProps {
   onToggleActive: (id: string, isActive: boolean) => void
   onDelete: (id: string) => void
   onCheck: (id: string) => void
+  onProcess: (id: string) => void
+  isProcessing?: boolean
 }
 
 const sourceTypeLabels: Record<string, string> = {
@@ -46,7 +48,7 @@ const sourceTypeColors: Record<string, string> = {
   MANUAL: "bg-blue-500",
 }
 
-export function SourceCard({ source, onToggleActive, onDelete, onCheck }: SourceCardProps) {
+export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProcess, isProcessing }: SourceCardProps) {
   return (
     <Card className="relative">
       <CardHeader className="pb-2">
@@ -105,7 +107,7 @@ export function SourceCard({ source, onToggleActive, onDelete, onCheck }: Source
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <div className="flex items-center justify-between text-sm text-muted-foreground">
           <span>{source._count.contents} items</span>
           <span>
@@ -114,6 +116,15 @@ export function SourceCard({ source, onToggleActive, onDelete, onCheck }: Source
               : "Never checked"}
           </span>
         </div>
+        <Button
+          className="w-full"
+          size="sm"
+          onClick={() => onProcess(source.id)}
+          disabled={isProcessing}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isProcessing ? 'animate-spin' : ''}`} />
+          {isProcessing ? "Processing..." : "Process Now"}
+        </Button>
       </CardContent>
     </Card>
   )

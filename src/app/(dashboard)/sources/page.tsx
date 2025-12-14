@@ -22,6 +22,7 @@ interface Source {
 export default function SourcesPage() {
   const [sources, setSources] = useState<Source[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [processingId, setProcessingId] = useState<string | null>(null)
 
   const fetchSources = async () => {
     try {
@@ -105,6 +106,28 @@ export default function SourcesPage() {
     }
   }
 
+  const handleProcess = async (id: string) => {
+    setProcessingId(id)
+    try {
+      const res = await fetch(`/api/sources/${id}/process`, {
+        method: "POST",
+      })
+
+      const data = await res.json()
+
+      if (res.ok) {
+        toast.success(data.message || "Processing complete")
+        fetchSources()
+      } else {
+        toast.error(data.error || "Failed to process source")
+      }
+    } catch (error) {
+      toast.error("Failed to process source")
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -137,6 +160,8 @@ export default function SourcesPage() {
               onToggleActive={handleToggleActive}
               onDelete={handleDelete}
               onCheck={handleCheck}
+              onProcess={handleProcess}
+              isProcessing={processingId === source.id}
             />
           ))}
         </div>
