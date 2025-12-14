@@ -2,7 +2,7 @@ import { inngest } from "../client"
 import { prisma } from "@/lib/db"
 import { analyzeWithClaude } from "@/lib/ai/claude"
 import { Prisma } from "@prisma/client"
-import { inngestLogger, analysisLogger, logger } from "@/lib/logger"
+import { logger } from "@/lib/logger"
 
 export const analyzeContent = inngest.createFunction(
   { id: "analyze-content" },
@@ -11,69 +11,82 @@ export const analyzeContent = inngest.createFunction(
     const { contentId, promptId } = event.data
     const functionStartTime = Date.now()
 
-    await inngestLogger.eventReceived("content/analyze", { contentId, promptId })
+    // Log function start (outside step.run for reliability)
+    await logger.info("inngest", "function-start", `Starting analyze-content for ${contentId}`, {
+      contentId,
+      metadata: { promptId },
+    })
 
-    const content = await step.run("get-content-with-transcript", async () => {
-      await inngestLogger.stepStart("content/analyze", "get-content-with-transcript")
-      const result = await prisma.content.findUnique({
-        where: { id: contentId },
-        include: {
-          transcript: true,
-          source: true,
-        },
+    // Step 1: Get content with transcript
+    let content
+    try {
+      content = await step.run("get-content-with-transcript", async () => {
+        return prisma.content.findUnique({
+          where: { id: contentId },
+          include: {
+            transcript: true,
+            source: true,
+          },
+        })
       })
-      await analysisLogger.getContent(
-        contentId,
-        !!result?.transcript,
-        result?.transcript?.wordCount
-      )
-      await inngestLogger.stepComplete("content/analyze", "get-content-with-transcript")
-      return result
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      await logger.error("inngest", "step-error", `get-content failed: ${msg}`, { contentId })
+      throw error
+    }
+
+    // Log after step completes
+    await logger.info("inngest", "step-complete", `get-content: hasTranscript=${!!content?.transcript}, words=${content?.transcript?.wordCount || 0}`, {
+      contentId,
+      metadata: { hasTranscript: !!content?.transcript },
     })
 
     if (!content || !content.transcript) {
       const error = !content ? "Content not found" : "Transcript not found"
-      await analysisLogger.error(contentId, error, "get-content-with-transcript")
+      await logger.error("inngest", "validation-error", error, { contentId })
       throw new Error(error)
     }
 
-    // Get the analysis prompt
-    const prompt = await step.run("get-prompt", async () => {
-      await inngestLogger.stepStart("content/analyze", "get-prompt")
-      let result
-      if (promptId) {
-        result = await prisma.analysisPrompt.findUnique({
-          where: { id: promptId },
-        })
-      } else {
-        result = await prisma.analysisPrompt.findFirst({
+    // Step 2: Get the analysis prompt
+    await logger.debug("inngest", "step-start", "Starting get-prompt step", { contentId })
+
+    let prompt
+    try {
+      prompt = await step.run("get-prompt", async () => {
+        if (promptId) {
+          return prisma.analysisPrompt.findUnique({
+            where: { id: promptId },
+          })
+        }
+        return prisma.analysisPrompt.findFirst({
           where: { isDefault: true, isActive: true },
         })
-      }
-      if (result) {
-        await analysisLogger.getPrompt(contentId, result.id, result.name)
-      } else {
-        await logger.warn("analysis", "get-prompt", "No prompt found, will create default", {
-          contentId,
-          metadata: { promptId },
-        })
-      }
-      await inngestLogger.stepComplete("content/analyze", "get-prompt")
-      return result
+      })
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      await logger.error("inngest", "step-error", `get-prompt failed: ${msg}`, { contentId })
+      throw error
+    }
+
+    await logger.info("inngest", "step-complete", `get-prompt: found=${!!prompt}, name=${prompt?.name || "none"}`, {
+      contentId,
+      metadata: { promptId: prompt?.id, promptName: prompt?.name },
     })
 
+    // Step 3: Create default prompt if needed
     let activePrompt = prompt
     if (!activePrompt) {
-      // Create a default prompt if none exists
-      activePrompt = await step.run("create-default-prompt", async () => {
-        await inngestLogger.stepStart("content/analyze", "create-default-prompt")
-        const newPrompt = await prisma.analysisPrompt.create({
-          data: {
-            name: "Disruption Analysis",
-            description: "Default analysis prompt for disruption intelligence",
-            isDefault: true,
-            isActive: true,
-            systemPrompt: `You are an expert analyst specializing in disruptive technologies, exponential trends, and future-forward thinking. Analyze the following transcript and provide a structured analysis.
+      await logger.info("inngest", "step-start", "Creating default prompt", { contentId })
+
+      try {
+        activePrompt = await step.run("create-default-prompt", async () => {
+          return prisma.analysisPrompt.create({
+            data: {
+              name: "Disruption Analysis",
+              description: "Default analysis prompt for disruption intelligence",
+              isDefault: true,
+              isActive: true,
+              systemPrompt: `You are an expert analyst specializing in disruptive technologies, exponential trends, and future-forward thinking. Analyze the following transcript and provide a structured analysis.
 
 OUTPUT FORMAT (JSON):
 {
@@ -108,81 +121,108 @@ Focus on:
 - Contrarian or non-obvious insights
 - Quantitative claims (numbers, percentages, dates)
 - Implications for business strategy`,
-          },
+            },
+          })
         })
-        await analysisLogger.getPrompt(contentId, newPrompt.id, newPrompt.name)
-        await inngestLogger.stepComplete("content/analyze", "create-default-prompt")
-        return newPrompt
-      })
-    }
-
-    const aiStartTime = Date.now()
-
-    // Run AI analysis
-    const analysisResult = await step.run("run-ai-analysis", async () => {
-      await inngestLogger.stepStart("content/analyze", "run-ai-analysis")
-      await analysisLogger.aiStart(contentId, content.transcript!.fullText.length)
-
-      try {
-        const result = await analyzeWithClaude(content.transcript!.fullText, activePrompt!.systemPrompt)
-        const aiDuration = Date.now() - aiStartTime
-        await analysisLogger.aiComplete(contentId, aiDuration, result.tokensUsed)
-        await inngestLogger.stepComplete("content/analyze", "run-ai-analysis", aiDuration)
-        return result
       } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : "Unknown error"
-        await analysisLogger.aiError(contentId, errorMsg)
+        const msg = error instanceof Error ? error.message : "Unknown error"
+        await logger.error("inngest", "step-error", `create-default-prompt failed: ${msg}`, { contentId })
         throw error
       }
+
+      await logger.info("inngest", "step-complete", `Created default prompt: ${activePrompt.name}`, { contentId })
+    }
+
+    // Step 4: Run AI analysis
+    const aiStartTime = Date.now()
+    await logger.info("inngest", "step-start", `Starting Claude analysis (${content.transcript.fullText.length} chars)`, {
+      contentId,
+      metadata: { transcriptLength: content.transcript.fullText.length },
     })
 
-    const processingTime = Date.now() - aiStartTime
-
-    // Save the analysis
-    const savedAnalysis = await step.run("save-analysis", async () => {
-      await inngestLogger.stepStart("content/analyze", "save-analysis")
-      const analysis = await prisma.analysis.create({
-        data: {
-          contentId: content.id,
-          promptId: activePrompt!.id,
-          model: "claude-3-5-sonnet-20241022",
-          result: analysisResult.result as Prisma.InputJsonValue,
-          summary: analysisResult.summary,
-          keyInsights: analysisResult.keyInsights,
-          quotableLines: analysisResult.quotableLines,
-          relevanceScore: analysisResult.relevanceScore,
-          tokensUsed: analysisResult.tokensUsed,
-          processingTime,
-        },
+    let analysisResult
+    try {
+      analysisResult = await step.run("run-ai-analysis", async () => {
+        return analyzeWithClaude(content.transcript!.fullText, activePrompt!.systemPrompt)
       })
-      await analysisLogger.saved(contentId, analysis.id, analysisResult.relevanceScore)
-      await inngestLogger.stepComplete("content/analyze", "save-analysis")
-      return analysis
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      await logger.error("inngest", "step-error", `run-ai-analysis failed: ${msg}`, {
+        contentId,
+        metadata: { error: msg },
+      })
+      throw error
+    }
+
+    const aiDuration = Date.now() - aiStartTime
+    await logger.info("inngest", "step-complete", `Claude analysis complete in ${aiDuration}ms, ${analysisResult.tokensUsed} tokens`, {
+      contentId,
+      duration: aiDuration,
+      metadata: { tokensUsed: analysisResult.tokensUsed, relevanceScore: analysisResult.relevanceScore },
     })
 
-    // Update content status
-    await step.run("update-content-status", async () => {
-      await inngestLogger.stepStart("content/analyze", "update-content-status")
-      const updated = await prisma.content.update({
-        where: { id: contentId },
-        data: { status: "ANALYZED" },
+    // Step 5: Save the analysis
+    await logger.debug("inngest", "step-start", "Saving analysis to database", { contentId })
+
+    let savedAnalysis
+    try {
+      savedAnalysis = await step.run("save-analysis", async () => {
+        return prisma.analysis.create({
+          data: {
+            contentId: content.id,
+            promptId: activePrompt!.id,
+            model: "claude-3-5-sonnet-20241022",
+            result: analysisResult.result as Prisma.InputJsonValue,
+            summary: analysisResult.summary,
+            keyInsights: analysisResult.keyInsights,
+            quotableLines: analysisResult.quotableLines,
+            relevanceScore: analysisResult.relevanceScore,
+            tokensUsed: analysisResult.tokensUsed,
+            processingTime: aiDuration,
+          },
+        })
       })
-      await inngestLogger.stepComplete("content/analyze", "update-content-status")
-      return updated
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      await logger.error("inngest", "step-error", `save-analysis failed: ${msg}`, { contentId })
+      throw error
+    }
+
+    await logger.info("inngest", "step-complete", `Analysis saved: ${savedAnalysis.id}`, {
+      contentId,
+      metadata: { analysisId: savedAnalysis.id },
     })
+
+    // Step 6: Update content status
+    try {
+      await step.run("update-content-status", async () => {
+        return prisma.content.update({
+          where: { id: contentId },
+          data: { status: "ANALYZED" },
+        })
+      })
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Unknown error"
+      await logger.error("inngest", "step-error", `update-content-status failed: ${msg}`, { contentId })
+      throw error
+    }
 
     const totalDuration = Date.now() - functionStartTime
-    await analysisLogger.complete(contentId, totalDuration)
-    await inngestLogger.functionComplete("content/analyze", totalDuration, {
-      analysisId: savedAnalysis.id,
-      relevanceScore: analysisResult.relevanceScore,
+    await logger.info("inngest", "function-complete", `Analysis complete in ${totalDuration}ms`, {
+      contentId,
+      duration: totalDuration,
+      metadata: {
+        analysisId: savedAnalysis.id,
+        relevanceScore: analysisResult.relevanceScore,
+        tokensUsed: analysisResult.tokensUsed,
+      },
     })
 
     return {
       analyzed: true,
       analysisId: savedAnalysis.id,
       relevanceScore: analysisResult.relevanceScore,
-      processingTime,
+      processingTime: aiDuration,
       totalDuration,
     }
   }
