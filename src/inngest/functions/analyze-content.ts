@@ -171,7 +171,7 @@ Focus on:
           data: {
             contentId: content.id,
             promptId: activePrompt!.id,
-            model: "claude-3-5-sonnet-20241022",
+            model: "claude-sonnet-4-5-20250929",
             result: analysisResult.result as Prisma.InputJsonValue,
             summary: analysisResult.summary,
             keyInsights: analysisResult.keyInsights,

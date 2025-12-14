@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { authOptions } from "@/lib/auth"
 import { fetchTranscriptWithDebug } from "@/lib/ingestion/transcript"
 import { Prisma } from "@prisma/client"
+import { inngest } from "@/inngest/client"
 
 export async function POST(
   request: Request,
@@ -82,13 +83,21 @@ export async function POST(
 
       console.log(`[API] Transcript saved successfully for: ${id}`)
 
+      // Automatically trigger AI analysis
+      console.log(`[API] Triggering automatic analysis for: ${id}`)
+      await inngest.send({
+        name: "content/analyze",
+        data: { contentId: id },
+      })
+
       return NextResponse.json({
         success: true,
-        message: "Transcript fetched and saved",
+        message: "Transcript fetched and saved - analysis started automatically",
         transcript: {
           wordCount: result.data.wordCount,
           segmentCount: result.data.segments.length,
         },
+        analysisTriggered: true,
         debug: result.debug,
       })
     } catch (dbError) {

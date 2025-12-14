@@ -40,10 +40,10 @@ export async function analyzeWithClaude(
   }
 
   try {
-    await logger.debug("claude", "api-call", `Calling Anthropic API with model claude-3-5-sonnet-20241022`)
+    await logger.debug("claude", "api-call", `Calling Anthropic API with model claude-sonnet-4-5-20250929`)
 
     const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 4096,
       messages: [
         {
@@ -145,7 +145,7 @@ export async function analyzeWithClaude(
 
 export async function generateSummary(text: string, maxWords: number = 100): Promise<string> {
   const message = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 500,
     messages: [
       {
@@ -160,7 +160,7 @@ export async function generateSummary(text: string, maxWords: number = 100): Pro
 
 export async function suggestTags(text: string): Promise<string[]> {
   const message = await anthropic.messages.create({
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-sonnet-4-5-20250929",
     max_tokens: 200,
     messages: [
       {

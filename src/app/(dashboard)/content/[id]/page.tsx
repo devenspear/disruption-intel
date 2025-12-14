@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, use } from "react"
+import { useEffect, useState, use, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { TranscriptViewer } from "@/components/content/transcript-viewer"
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import {
   ArrowLeft,
   ExternalLink,
@@ -18,6 +19,8 @@ import {
   Tag,
   RefreshCw,
   AlertCircle,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react"
 import { formatDistanceToNow, format } from "date-fns"
 import { toast } from "sonner"
@@ -88,6 +91,12 @@ interface TranscriptDebug {
   errorMessage: string | null
 }
 
+interface AnalysisStep {
+  name: string
+  status: "pending" | "running" | "complete" | "error"
+  message?: string
+}
+
 export default function ContentDetailPage({
   params,
 }: {
@@ -101,13 +110,18 @@ export default function ContentDetailPage({
   const [isFetchingTranscript, setIsFetchingTranscript] = useState(false)
   const [transcriptError, setTranscriptError] = useState<string | null>(null)
   const [transcriptDebug, setTranscriptDebug] = useState<TranscriptDebug | null>(null)
+  const [analysisSteps, setAnalysisSteps] = useState<AnalysisStep[]>([])
+  const [analysisProgress, setAnalysisProgress] = useState(0)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
+  const [pollCount, setPollCount] = useState(0)
 
-  const fetchContent = async () => {
+  const fetchContent = useCallback(async () => {
     try {
       const res = await fetch(`/api/content/${id}`)
       if (res.ok) {
         const data = await res.json()
         setContent(data)
+        return data
       } else if (res.status === 404) {
         router.push("/content")
       }
@@ -117,27 +131,86 @@ export default function ContentDetailPage({
     } finally {
       setIsLoading(false)
     }
-  }
+    return null
+  }, [id, router])
 
   useEffect(() => {
     fetchContent()
-  }, [id])
+  }, [fetchContent])
+
+  // Poll for analysis updates when analyzing
+  useEffect(() => {
+    if (!isAnalyzing) return
+
+    const pollInterval = setInterval(async () => {
+      setPollCount((prev) => prev + 1)
+
+      // Update progress simulation while waiting
+      setAnalysisProgress((prev) => Math.min(prev + 5, 90))
+
+      const data = await fetchContent()
+
+      if (data?.analyses?.length > 0 && data.status === "ANALYZED") {
+        // Analysis complete!
+        setAnalysisSteps((prev) =>
+          prev.map((step) => ({ ...step, status: "complete" as const }))
+        )
+        setAnalysisProgress(100)
+        setIsAnalyzing(false)
+        toast.success("Analysis complete!")
+        clearInterval(pollInterval)
+      } else if (pollCount > 60) {
+        // Timeout after ~2 minutes
+        setAnalysisError("Analysis is taking longer than expected. Check logs for details.")
+        setIsAnalyzing(false)
+        clearInterval(pollInterval)
+      }
+    }, 2000)
+
+    return () => clearInterval(pollInterval)
+  }, [isAnalyzing, fetchContent, pollCount])
 
   const handleAnalyze = async () => {
     setIsAnalyzing(true)
+    setAnalysisError(null)
+    setPollCount(0)
+    setAnalysisProgress(10)
+
+    // Initialize steps
+    setAnalysisSteps([
+      { name: "Preparing content", status: "running" },
+      { name: "Running AI analysis", status: "pending" },
+      { name: "Saving results", status: "pending" },
+    ])
+
     try {
       const res = await fetch(`/api/content/${id}/analyze`, {
         method: "POST",
       })
+      const data = await res.json()
+
       if (res.ok) {
-        toast.success("Analysis triggered")
-        // Poll for updates
-        setTimeout(fetchContent, 3000)
+        toast.info("Analysis started - this may take 30-60 seconds...")
+        setAnalysisSteps((prev) =>
+          prev.map((step, i) =>
+            i === 0 ? { ...step, status: "complete" as const } :
+            i === 1 ? { ...step, status: "running" as const } : step
+          )
+        )
+        setAnalysisProgress(30)
+        // Polling will handle the rest
       } else {
-        toast.error("Failed to trigger analysis")
+        setAnalysisError(data.error || "Failed to trigger analysis")
+        toast.error(data.error || "Failed to trigger analysis")
+        setIsAnalyzing(false)
+        setAnalysisSteps([])
       }
-    } finally {
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Network error"
+      setAnalysisError(errMsg)
+      toast.error(errMsg)
       setIsAnalyzing(false)
+      setAnalysisSteps([])
     }
   }
 
@@ -158,6 +231,16 @@ export default function ContentDetailPage({
 
       if (data.success) {
         toast.success(`Transcript fetched: ${data.transcript?.wordCount || 0} words`)
+        if (data.analysisTriggered) {
+          toast.info("Analysis started automatically - this may take 30-60 seconds...")
+          setIsAnalyzing(true)
+          setAnalysisProgress(10)
+          setAnalysisSteps([
+            { name: "Preparing content", status: "complete" },
+            { name: "Running AI analysis", status: "running" },
+            { name: "Saving results", status: "pending" },
+          ])
+        }
         fetchContent()
       } else {
         setTranscriptError(data.error || "Failed to fetch transcript")
@@ -332,6 +415,71 @@ export default function ContentDetailPage({
 
         {/* Right: Analysis */}
         <div className="space-y-6">
+          {/* Analysis Status Panel - shown when analyzing */}
+          {(isAnalyzing || analysisError) && (
+            <Card className="border-2 border-primary/50">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  {isAnalyzing ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      Analysis in Progress
+                    </>
+                  ) : analysisError ? (
+                    <>
+                      <AlertCircle className="h-5 w-5 text-red-500" />
+                      Analysis Error
+                    </>
+                  ) : null}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isAnalyzing && (
+                  <>
+                    <Progress value={analysisProgress} className="h-2" />
+                    <div className="space-y-2">
+                      {analysisSteps.map((step, index) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          {step.status === "complete" ? (
+                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                          ) : step.status === "running" ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                          ) : step.status === "error" ? (
+                            <AlertCircle className="h-4 w-4 text-red-500" />
+                          ) : (
+                            <div className="h-4 w-4 rounded-full border-2 border-muted" />
+                          )}
+                          <span className={step.status === "running" ? "text-primary font-medium" : "text-muted-foreground"}>
+                            {step.name}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      AI analysis typically takes 30-60 seconds for long transcripts
+                    </p>
+                  </>
+                )}
+                {analysisError && (
+                  <div className="p-3 bg-red-950/50 border border-red-800 rounded-lg">
+                    <p className="text-sm text-red-400">{analysisError}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => {
+                        setAnalysisError(null)
+                        setAnalysisSteps([])
+                      }}
+                    >
+                      Dismiss
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           <AnalysisDisplay
             analyses={content.analyses}
             onReanalyze={handleAnalyze}
