@@ -8,7 +8,6 @@ import { AnalysisDisplay } from "@/components/analysis/analysis-display"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
   ArrowLeft,
@@ -18,6 +17,7 @@ import {
   FileText,
   Tag,
   RefreshCw,
+  AlertCircle,
 } from "lucide-react"
 import { formatDistanceToNow, format } from "date-fns"
 import { toast } from "sonner"
@@ -80,6 +80,14 @@ interface ContentDetail {
   }>
 }
 
+interface TranscriptDebug {
+  videoId: string
+  timestamp: string
+  itemCount: number | null
+  errorType: string | null
+  errorMessage: string | null
+}
+
 export default function ContentDetailPage({
   params,
 }: {
@@ -90,6 +98,9 @@ export default function ContentDetailPage({
   const [content, setContent] = useState<ContentDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isFetchingTranscript, setIsFetchingTranscript] = useState(false)
+  const [transcriptError, setTranscriptError] = useState<string | null>(null)
+  const [transcriptDebug, setTranscriptDebug] = useState<TranscriptDebug | null>(null)
 
   const fetchContent = async () => {
     try {
@@ -127,6 +138,37 @@ export default function ContentDetailPage({
       }
     } finally {
       setIsAnalyzing(false)
+    }
+  }
+
+  const handleFetchTranscript = async () => {
+    setIsFetchingTranscript(true)
+    setTranscriptError(null)
+    setTranscriptDebug(null)
+
+    try {
+      const res = await fetch(`/api/content/${id}/transcript`, {
+        method: "POST",
+      })
+      const data = await res.json()
+
+      if (data.debug) {
+        setTranscriptDebug(data.debug)
+      }
+
+      if (data.success) {
+        toast.success(`Transcript fetched: ${data.transcript?.wordCount || 0} words`)
+        fetchContent()
+      } else {
+        setTranscriptError(data.error || "Failed to fetch transcript")
+        toast.error(data.error || "Failed to fetch transcript")
+      }
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : "Network error"
+      setTranscriptError(errMsg)
+      toast.error(errMsg)
+    } finally {
+      setIsFetchingTranscript(false)
     }
   }
 
@@ -234,13 +276,55 @@ export default function ContentDetailPage({
                 videoId={content.externalId}
               />
             ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-4">
-                <p className="text-muted-foreground mb-4">
+              <div className="flex flex-col items-center justify-center h-full text-center p-4 space-y-4">
+                <p className="text-muted-foreground">
                   No transcript available
                 </p>
-                <Button onClick={handleAnalyze} disabled={isAnalyzing}>
-                  {isAnalyzing ? "Processing..." : "Fetch Transcript"}
+                <Button onClick={handleFetchTranscript} disabled={isFetchingTranscript}>
+                  {isFetchingTranscript ? (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                      Fetching...
+                    </>
+                  ) : (
+                    "Fetch Transcript"
+                  )}
                 </Button>
+
+                {/* Error Display */}
+                {transcriptError && (
+                  <div className="w-full max-w-md p-4 bg-red-950 border border-red-800 rounded-lg text-left">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-red-400">Transcript Error</p>
+                        <p className="text-sm text-red-300">{transcriptError}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Debug Info */}
+                {transcriptDebug && (
+                  <div className="w-full max-w-md p-4 bg-zinc-900 border border-zinc-700 rounded-lg text-left">
+                    <p className="text-xs font-medium text-zinc-400 mb-2">Debug Info</p>
+                    <div className="space-y-1 text-xs font-mono text-zinc-500">
+                      <p>Video ID: {transcriptDebug.videoId}</p>
+                      <p>Timestamp: {transcriptDebug.timestamp}</p>
+                      <p>Items Found: {transcriptDebug.itemCount ?? "N/A"}</p>
+                      {transcriptDebug.errorType && (
+                        <p className="text-red-400">Error Type: {transcriptDebug.errorType}</p>
+                      )}
+                      {transcriptDebug.errorMessage && (
+                        <p className="text-red-400 break-all">Error: {transcriptDebug.errorMessage}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs text-zinc-600">
+                  Video ID: {content.externalId}
+                </p>
               </div>
             )}
           </CardContent>
