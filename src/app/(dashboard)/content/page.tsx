@@ -2,37 +2,12 @@
 
 import { Suspense, useEffect, useState, useCallback, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
-import { ContentTable } from "@/components/content/content-table"
+import { ContentTable, Content } from "@/components/content/content-table"
 import { ContentFilters } from "@/components/content/content-filters"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
 import { toast } from "sonner"
-import { Loader2 } from "lucide-react"
-
-interface Content {
-  id: string
-  title: string
-  publishedAt: string
-  status: string
-  contentType?: string
-  thumbnailUrl: string | null
-  originalUrl: string
-  source: {
-    id: string
-    name: string
-    type: string
-  }
-  transcript: {
-    wordCount: number
-    source?: string
-  } | null
-  analyses: Array<{
-    relevanceScore: number | null
-  }>
-  _count: {
-    tags: number
-    usageHistory: number
-  }
-}
+import { Loader2, Sparkles, Archive, Trash2, X } from "lucide-react"
 
 interface Source {
   id: string
@@ -49,6 +24,8 @@ function ContentPageContent() {
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
   const observerRef = useRef<IntersectionObserver | null>(null)
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
@@ -150,6 +127,7 @@ function ContentPageContent() {
   useEffect(() => {
     setPage(1)
     setContents([])
+    setSelectedIds(new Set()) // Clear selection on filter change
     fetchContent(1, false)
   }, [filters, fetchContent])
 
@@ -189,6 +167,7 @@ function ContentPageContent() {
       sortBy: "publishedAt",
       sortOrder: "desc",
     })
+    setSelectedIds(new Set())
     router.push("/content")
   }
 
@@ -198,7 +177,6 @@ function ContentPageContent() {
     })
     if (res.ok) {
       toast.success("Analysis triggered")
-      // Refresh the list
       setPage(1)
       fetchContent(1, false)
     } else {
@@ -215,6 +193,11 @@ function ContentPageContent() {
     if (res.ok) {
       toast.success("Content archived")
       setContents(prev => prev.filter(c => c.id !== id))
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     } else {
       toast.error("Failed to archive content")
     }
@@ -229,9 +212,159 @@ function ContentPageContent() {
     if (res.ok) {
       toast.success("Content deleted")
       setContents(prev => prev.filter(c => c.id !== id))
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
     } else {
       toast.error("Failed to delete content")
     }
+  }
+
+  // Batch operations
+  const handleBatchProcess = async () => {
+    if (selectedIds.size === 0) return
+
+    setIsBatchProcessing(true)
+    const ids = Array.from(selectedIds)
+    let successCount = 0
+    let failCount = 0
+
+    toast.info(`Processing ${ids.length} items...`)
+
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/content/${id}/process`, {
+          method: "POST",
+        })
+        if (res.ok) {
+          successCount++
+        } else {
+          failCount++
+        }
+      } catch {
+        failCount++
+      }
+    }
+
+    setIsBatchProcessing(false)
+    setSelectedIds(new Set())
+
+    if (failCount === 0) {
+      toast.success(`Successfully triggered processing for ${successCount} items`)
+    } else {
+      toast.warning(`Processed ${successCount} items, ${failCount} failed`)
+    }
+
+    // Refresh the list
+    setPage(1)
+    fetchContent(1, false)
+  }
+
+  const handleBatchAnalyze = async () => {
+    if (selectedIds.size === 0) return
+
+    setIsBatchProcessing(true)
+    const ids = Array.from(selectedIds)
+    let successCount = 0
+    let failCount = 0
+
+    toast.info(`Analyzing ${ids.length} items...`)
+
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/content/${id}/analyze`, {
+          method: "POST",
+        })
+        if (res.ok) {
+          successCount++
+        } else {
+          failCount++
+        }
+      } catch {
+        failCount++
+      }
+    }
+
+    setIsBatchProcessing(false)
+    setSelectedIds(new Set())
+
+    if (failCount === 0) {
+      toast.success(`Successfully triggered analysis for ${successCount} items`)
+    } else {
+      toast.warning(`Analyzed ${successCount} items, ${failCount} failed`)
+    }
+
+    // Refresh the list
+    setPage(1)
+    fetchContent(1, false)
+  }
+
+  const handleBatchArchive = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Archive ${selectedIds.size} items?`)) return
+
+    setIsBatchProcessing(true)
+    const ids = Array.from(selectedIds)
+    let successCount = 0
+
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/content/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: "ARCHIVED" }),
+        })
+        if (res.ok) {
+          successCount++
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    setIsBatchProcessing(false)
+    setSelectedIds(new Set())
+    toast.success(`Archived ${successCount} items`)
+
+    // Refresh
+    setPage(1)
+    fetchContent(1, false)
+  }
+
+  const handleBatchDelete = async () => {
+    if (selectedIds.size === 0) return
+    if (!confirm(`Delete ${selectedIds.size} items? This cannot be undone.`)) return
+
+    setIsBatchProcessing(true)
+    const ids = Array.from(selectedIds)
+    let successCount = 0
+
+    for (const id of ids) {
+      try {
+        const res = await fetch(`/api/content/${id}`, {
+          method: "DELETE",
+        })
+        if (res.ok) {
+          successCount++
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    setIsBatchProcessing(false)
+    setSelectedIds(new Set())
+    toast.success(`Deleted ${successCount} items`)
+
+    // Refresh
+    setPage(1)
+    fetchContent(1, false)
+  }
+
+  const clearSelection = () => {
+    setSelectedIds(new Set())
   }
 
   return (
@@ -251,6 +384,67 @@ function ContentPageContent() {
         onFilterChange={handleFilterChange}
         onReset={handleReset}
       />
+
+      {/* Batch Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-0 z-10 flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
+          <span className="text-sm font-medium">
+            {selectedIds.size} selected
+          </span>
+          <div className="flex-1" />
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBatchProcess}
+            disabled={isBatchProcessing}
+          >
+            {isBatchProcessing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Process Selected
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBatchAnalyze}
+            disabled={isBatchProcessing}
+          >
+            {isBatchProcessing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Analyze Selected
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBatchArchive}
+            disabled={isBatchProcessing}
+          >
+            <Archive className="h-4 w-4 mr-2" />
+            Archive
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={handleBatchDelete}
+            disabled={isBatchProcessing}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={clearSelection}
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <div className="space-y-4">
@@ -278,6 +472,8 @@ function ContentPageContent() {
               sortBy={filters.sortBy}
               sortOrder={filters.sortOrder}
               onSort={handleSort}
+              selectedIds={selectedIds}
+              onSelectionChange={setSelectedIds}
             />
           </div>
 

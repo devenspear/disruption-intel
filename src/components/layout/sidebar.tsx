@@ -11,6 +11,7 @@ import {
   Settings,
   MessageSquare,
   LogOut,
+  Brain,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
@@ -19,6 +20,7 @@ const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
   { name: "Sources", href: "/sources", icon: Radio },
   { name: "Content", href: "/content", icon: FileText },
+  { name: "Analysis", href: "/analysis", icon: Brain },
   { name: "Search", href: "/search", icon: Search },
   { name: "Prompts", href: "/settings/prompts", icon: MessageSquare },
   { name: "Settings", href: "/settings", icon: Settings },
