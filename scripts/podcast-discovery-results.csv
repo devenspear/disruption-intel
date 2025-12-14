@@ -1,0 +1,22 @@
+Name,Website URL,Feed URL,Valid,Episode Count,Has Transcripts,Transcript Count,Latest Episode,Error
+"20 VC","https://www.thetwentyminutevc.com/","https://thetwentyminutevc.libsyn.com/rss",true,1394,false,0,"20Growth: How Wiz Built a $30BN Brand in Enterprise | What Worked vs What Was a Mega Failure: Lessons Learned | Why Marketers Make the Worst CMOs & What To Look for in Growth with Raaz Herzberg",""
+"BG2 Pod","https://www.bg2pod.com/","https://anchor.fm/s/f06c2370/podcast/rss",true,41,false,0,"All things AI w @altcap @sama & @satyanadella. A Halloween Special. 🎃🔥BG2 w/ Brad Gerstner",""
+"Big Technology Podcast","https://www.bigtechnology.com/","https://www.bigtechnology.com/feed",true,20,false,0,"Enterprise Will Be a Top OpenAI Priority In 2026, Sam Altman Tells Editors at NYC Lunch",""
+"Dwarkesh Podcast","https://www.dwarkeshpatel.com/podcast","https://api.substack.com/feed/podcast/69345.rss",true,112,false,0,"Ilya Sutskever – We're moving from the age of scaling to the age of research",""
+"Google AI Release Notes","https://ai.google/updates/","",false,0,false,0,"","No RSS feed discovered"
+"Google DeepMind: The Podcast","https://deepmind.google/discover/podcast/","https://feeds.simplecast.com/JT6pbPkg",true,45,false,0,"The Arrival of AGI with Shane Legg (co-founder of DeepMind)",""
+"Hard Fork","https://www.nytimes.com/column/hard-fork","https://feeds.simplecast.com/l2i9YnTd",true,170,false,0,"Australia Kicks Kids Off Social Media + Is the A.I. Water Issue Fake? + Hard Fork Wrapped",""
+"Lenny's Podcast","https://www.lennyspodcast.com/","https://api.substack.com/feed/podcast/10845.rss",true,313,false,0,"Why humans are AI’s biggest bottleneck (and what’s coming in 2026) | Alexander Embiricos (OpenAI Codex Product Lead)",""
+"Lex Fridman Podcast","https://lexfridman.com/podcast/","https://lexfridman.com/feed/podcast/",true,488,false,0,"#487 – Irving Finkel: Deciphering Secrets of Ancient Civilizations & Flood Myths",""
+"No Priors","https://www.nopriors.com/","https://feeds.megaphone.fm/nopriors",true,144,false,0,"The Future of Voice AI: Agents, Dubbing, and Real-Time Translation with ElevenLabs Co-Founder Mati Staniszewski",""
+"The 80,000 Hours Podcast","https://80000hours.org/podcast/","https://feeds.transistor.fm/the-80000-hours-podcast",false,0,false,0,"","Status code 404"
+"The a16z Show","https://a16z.com/podcasts/","https://feeds.simplecast.com/JGE3yC0V",true,982,false,0,"AI Eats the World: Benedict Evans on the Next Platform Shift",""
+"The Cognitive Revolution","https://www.cognitiverevolution.ai/","https://www.cognitiverevolution.ai/latest/rss/",true,15,false,0,"AI's Energy & Water Demands: Sorting Fact from Fiction with Andy Masley",""
+"The Logan Bartlett Show","https://www.loganbartlett.com/podcast","https://theloganbartlettshow.simplecast.com/rss",false,0,false,0,"","Attribute without value
+Line: 8
+Column: 72
+Char: >"
+"The MAD Podcast","https://www.madpod.com/","https://anchor.fm/s/f2ee4948/podcast/rss",true,102,false,0,"What’s Next for AI? OpenAI’s Łukasz Kaiser (Transformer Co-Author)",""
+"The OpenAI Podcast","https://openai.com/podcast/","",false,0,false,0,"","No RSS feed discovered"
+"Uncapped","https://uncapped.com/podcast","",false,0,false,0,"","No RSS feed discovered"
+"Y Combinator Startup Podcast","https://www.ycombinator.com/podcast","https://anchor.fm/s/8c1524bc/podcast/rss",true,287,false,0,"The End of the Designer–Engineer Divide",""
