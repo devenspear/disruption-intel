@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { MessageSquare, Bell, User, Key } from "lucide-react"
+import { MessageSquare, Bell, User, Key, ScrollText } from "lucide-react"
 
 const settingsLinks = [
   {
@@ -11,6 +11,12 @@ const settingsLinks = [
     description: "Manage AI prompts for content analysis",
     href: "/settings/prompts",
     icon: MessageSquare,
+  },
+  {
+    title: "System Logs",
+    description: "View analysis and system activity logs",
+    href: "/settings/logs",
+    icon: ScrollText,
   },
   {
     title: "Profile",

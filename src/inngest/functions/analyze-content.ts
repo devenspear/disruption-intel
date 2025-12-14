@@ -2,44 +2,72 @@ import { inngest } from "../client"
 import { prisma } from "@/lib/db"
 import { analyzeWithClaude } from "@/lib/ai/claude"
 import { Prisma } from "@prisma/client"
+import { inngestLogger, analysisLogger, logger } from "@/lib/logger"
 
 export const analyzeContent = inngest.createFunction(
   { id: "analyze-content" },
   { event: "content/analyze" },
   async ({ event, step }) => {
     const { contentId, promptId } = event.data
+    const functionStartTime = Date.now()
+
+    await inngestLogger.eventReceived("content/analyze", { contentId, promptId })
 
     const content = await step.run("get-content-with-transcript", async () => {
-      return prisma.content.findUnique({
+      await inngestLogger.stepStart("content/analyze", "get-content-with-transcript")
+      const result = await prisma.content.findUnique({
         where: { id: contentId },
         include: {
           transcript: true,
           source: true,
         },
       })
+      await analysisLogger.getContent(
+        contentId,
+        !!result?.transcript,
+        result?.transcript?.wordCount
+      )
+      await inngestLogger.stepComplete("content/analyze", "get-content-with-transcript")
+      return result
     })
 
     if (!content || !content.transcript) {
-      throw new Error("Content or transcript not found")
+      const error = !content ? "Content not found" : "Transcript not found"
+      await analysisLogger.error(contentId, error, "get-content-with-transcript")
+      throw new Error(error)
     }
 
     // Get the analysis prompt
     const prompt = await step.run("get-prompt", async () => {
+      await inngestLogger.stepStart("content/analyze", "get-prompt")
+      let result
       if (promptId) {
-        return prisma.analysisPrompt.findUnique({
+        result = await prisma.analysisPrompt.findUnique({
           where: { id: promptId },
         })
+      } else {
+        result = await prisma.analysisPrompt.findFirst({
+          where: { isDefault: true, isActive: true },
+        })
       }
-      // Get default prompt
-      return prisma.analysisPrompt.findFirst({
-        where: { isDefault: true, isActive: true },
-      })
+      if (result) {
+        await analysisLogger.getPrompt(contentId, result.id, result.name)
+      } else {
+        await logger.warn("analysis", "get-prompt", "No prompt found, will create default", {
+          contentId,
+          metadata: { promptId },
+        })
+      }
+      await inngestLogger.stepComplete("content/analyze", "get-prompt")
+      return result
     })
 
-    if (!prompt) {
+    let activePrompt = prompt
+    if (!activePrompt) {
       // Create a default prompt if none exists
-      const defaultPrompt = await step.run("create-default-prompt", async () => {
-        return prisma.analysisPrompt.create({
+      activePrompt = await step.run("create-default-prompt", async () => {
+        await inngestLogger.stepStart("content/analyze", "create-default-prompt")
+        const newPrompt = await prisma.analysisPrompt.create({
           data: {
             name: "Disruption Analysis",
             description: "Default analysis prompt for disruption intelligence",
@@ -82,26 +110,41 @@ Focus on:
 - Implications for business strategy`,
           },
         })
+        await analysisLogger.getPrompt(contentId, newPrompt.id, newPrompt.name)
+        await inngestLogger.stepComplete("content/analyze", "create-default-prompt")
+        return newPrompt
       })
-
-      return defaultPrompt
     }
 
-    const startTime = Date.now()
+    const aiStartTime = Date.now()
 
     // Run AI analysis
     const analysisResult = await step.run("run-ai-analysis", async () => {
-      return analyzeWithClaude(content.transcript!.fullText, prompt!.systemPrompt)
+      await inngestLogger.stepStart("content/analyze", "run-ai-analysis")
+      await analysisLogger.aiStart(contentId, content.transcript!.fullText.length)
+
+      try {
+        const result = await analyzeWithClaude(content.transcript!.fullText, activePrompt!.systemPrompt)
+        const aiDuration = Date.now() - aiStartTime
+        await analysisLogger.aiComplete(contentId, aiDuration, result.tokensUsed)
+        await inngestLogger.stepComplete("content/analyze", "run-ai-analysis", aiDuration)
+        return result
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : "Unknown error"
+        await analysisLogger.aiError(contentId, errorMsg)
+        throw error
+      }
     })
 
-    const processingTime = Date.now() - startTime
+    const processingTime = Date.now() - aiStartTime
 
     // Save the analysis
-    await step.run("save-analysis", async () => {
-      return prisma.analysis.create({
+    const savedAnalysis = await step.run("save-analysis", async () => {
+      await inngestLogger.stepStart("content/analyze", "save-analysis")
+      const analysis = await prisma.analysis.create({
         data: {
           contentId: content.id,
-          promptId: prompt!.id,
+          promptId: activePrompt!.id,
           model: "claude-3-5-sonnet-20241022",
           result: analysisResult.result as Prisma.InputJsonValue,
           summary: analysisResult.summary,
@@ -112,20 +155,35 @@ Focus on:
           processingTime,
         },
       })
+      await analysisLogger.saved(contentId, analysis.id, analysisResult.relevanceScore)
+      await inngestLogger.stepComplete("content/analyze", "save-analysis")
+      return analysis
     })
 
     // Update content status
     await step.run("update-content-status", async () => {
-      return prisma.content.update({
+      await inngestLogger.stepStart("content/analyze", "update-content-status")
+      const updated = await prisma.content.update({
         where: { id: contentId },
         data: { status: "ANALYZED" },
       })
+      await inngestLogger.stepComplete("content/analyze", "update-content-status")
+      return updated
+    })
+
+    const totalDuration = Date.now() - functionStartTime
+    await analysisLogger.complete(contentId, totalDuration)
+    await inngestLogger.functionComplete("content/analyze", totalDuration, {
+      analysisId: savedAnalysis.id,
+      relevanceScore: analysisResult.relevanceScore,
     })
 
     return {
       analyzed: true,
+      analysisId: savedAnalysis.id,
       relevanceScore: analysisResult.relevanceScore,
       processingTime,
+      totalDuration,
     }
   }
 )

@@ -192,3 +192,26 @@ model Job {
   endedAt   DateTime?
   createdAt DateTime @default(now())
 }
+
+enum LogLevel {
+  DEBUG
+  INFO
+  WARN
+  ERROR
+}
+
+model SystemLog {
+  id          String   @id @default(cuid())
+  level       LogLevel @default(INFO)
+  category    String   // e.g., "analysis", "transcript", "inngest", "api"
+  action      String   // e.g., "analyze.start", "analyze.complete", "analyze.error"
+  message     String   @db.Text
+  contentId   String?  // Optional reference to content
+  metadata    Json?    // Additional context data
+  duration    Int?     // Duration in ms for timed operations
+  createdAt   DateTime @default(now())
+
+  @@index([category])
+  @@index([contentId])
+  @@index([createdAt])
+}
