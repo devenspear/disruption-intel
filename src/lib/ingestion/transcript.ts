@@ -38,55 +38,67 @@ export async function fetchTranscriptWithDebug(videoId: string): Promise<Transcr
     itemCount: null,
     errorType: null,
     errorMessage: null,
-    method: "python-api",
+    method: "python-local",
   }
 
   console.log(`[Transcript] Starting fetch for video: ${videoId}`)
 
   try {
-    // Call the Python serverless function for transcript fetching
-    // In production: /api/transcript, In development: use Python subprocess
-    const isDev = process.env.NODE_ENV === "development"
-    let result
+    // Use Python subprocess for transcript fetching
+    // This works locally and on platforms that support Python
+    const { exec } = await import("child_process")
+    const { promisify } = await import("util")
+    const execAsync = promisify(exec)
 
-    if (isDev && process.env.USE_LOCAL_PYTHON === "true") {
-      // Development mode with local Python
-      const { exec } = await import("child_process")
-      const { promisify } = await import("util")
-      const execAsync = promisify(exec)
+    // Try multiple Python paths
+    const pythonPaths = [
+      process.env.PYTHON_PATH,
+      `${process.cwd()}/.venv/bin/python3`,
+      "python3",
+      "python",
+    ].filter(Boolean) as string[]
 
-      const pythonPath = process.env.PYTHON_PATH || "python3"
-      const scriptPath = `${process.cwd()}/scripts/fetch-transcript.py`
+    let result = null
+    let lastError = null
 
-      console.log(`[Transcript] Using local Python: ${pythonPath}`)
+    for (const pythonPath of pythonPaths) {
+      try {
+        const scriptPath = `${process.cwd()}/scripts/fetch-transcript.py`
+        console.log(`[Transcript] Trying Python: ${pythonPath}`)
 
-      const { stdout } = await execAsync(
-        `${pythonPath} "${scriptPath}" "${videoId}"`,
-        { timeout: 30000, cwd: process.cwd() }
-      )
+        const { stdout } = await execAsync(
+          `"${pythonPath}" "${scriptPath}" "${videoId}"`,
+          { timeout: 30000, cwd: process.cwd() }
+        )
 
-      result = JSON.parse(stdout)
-    } else {
-      // Production mode: call the Python API endpoint
-      const baseUrl = process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : process.env.NEXTAUTH_URL || "http://localhost:3000"
+        result = JSON.parse(stdout)
+        debug.method = `python:${pythonPath}`
+        break
+      } catch (e) {
+        lastError = e
+        continue
+      }
+    }
 
-      const apiUrl = `${baseUrl}/api/transcript?videoId=${encodeURIComponent(videoId)}`
-      console.log(`[Transcript] Calling API: ${apiUrl}`)
+    if (!result) {
+      // Python not available - provide helpful error
+      debug.errorType = "PythonNotAvailable"
+      debug.errorMessage = "Transcript fetching requires Python. YouTube blocks server-side requests from npm packages."
 
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" },
-      })
+      console.log(`[Transcript] Python not available: ${lastError}`)
 
-      result = await response.json()
+      return {
+        success: false,
+        data: null,
+        error: "Automatic transcript fetching is temporarily unavailable. Please try again later or contact support.",
+        debug,
+      }
     }
 
     if (!result.success) {
       debug.errorType = result.errorType || "FetchError"
       debug.errorMessage = result.error || "Unknown error"
-      console.log(`[Transcript] API returned error: ${debug.errorMessage}`)
+      console.log(`[Transcript] Python returned error: ${debug.errorMessage}`)
 
       return {
         success: false,
