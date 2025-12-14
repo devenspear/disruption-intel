@@ -1,8 +1,13 @@
 import Anthropic from "@anthropic-ai/sdk"
+import OpenAI from "openai"
 import { logger } from "@/lib/logger"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
+})
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 })
 
 export interface AnalysisResult {
@@ -12,173 +17,283 @@ export interface AnalysisResult {
   quotableLines: string[]
   relevanceScore: number
   tokensUsed: number
+  model: string
 }
 
-export async function analyzeWithClaude(
+// Timeout wrapper for API calls
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${operation} timed out after ${timeoutMs / 1000}s`)), timeoutMs)
+    ),
+  ])
+}
+
+// Parse JSON from AI response
+function parseAnalysisResponse(responseText: string): Record<string, unknown> {
+  try {
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      return JSON.parse(jsonMatch[0])
+    }
+  } catch {
+    // Fall through to default
+  }
+  return {
+    summary: responseText,
+    keyInsights: [],
+    quotableLines: [],
+    relevanceScore: 0.5,
+  }
+}
+
+// Format analysis result from parsed response
+function formatAnalysisResult(
+  parsedResult: Record<string, unknown>,
+  tokensUsed: number,
+  model: string
+): AnalysisResult {
+  return {
+    result: parsedResult,
+    summary: (parsedResult.summary as string) || "",
+    keyInsights: (parsedResult.keyInsights as string[]) || [],
+    quotableLines: ((parsedResult.quotableLines as Array<{ quote: string } | string>) || []).map(
+      (q) => (typeof q === "string" ? q : q.quote)
+    ),
+    relevanceScore: (parsedResult.relevanceScore as number) || 0.5,
+    tokensUsed,
+    model,
+  }
+}
+
+// Claude analysis with timeout
+async function analyzeWithClaudeInternal(
   transcript: string,
-  systemPrompt: string
+  systemPrompt: string,
+  timeoutMs: number = 90000
 ): Promise<AnalysisResult> {
   const startTime = Date.now()
 
   await logger.debug("claude", "analyze-start", `Starting Claude analysis`, {
     metadata: {
       transcriptLength: transcript.length,
-      promptLength: systemPrompt.length,
-      hasApiKey: !!process.env.ANTHROPIC_API_KEY,
+      timeoutMs,
     },
   })
 
-  // Truncate transcript if too long (Claude has context limits)
-  const maxLength = 100000 // ~25k tokens
+  const maxLength = 100000
   const truncatedTranscript =
     transcript.length > maxLength
       ? transcript.substring(0, maxLength) + "\n\n[Transcript truncated due to length...]"
       : transcript
 
-  if (transcript.length > maxLength) {
-    await logger.warn("claude", "truncated", `Transcript truncated from ${transcript.length} to ${maxLength} chars`)
-  }
+  const messagePromise = anthropic.messages.create({
+    model: "claude-sonnet-4-5-20250929",
+    max_tokens: 4096,
+    messages: [
+      {
+        role: "user",
+        content: `${systemPrompt}\n\nTRANSCRIPT:\n${truncatedTranscript}`,
+      },
+    ],
+  })
 
+  const message = await withTimeout(messagePromise, timeoutMs, "Claude API call")
+
+  const apiDuration = Date.now() - startTime
+  await logger.info("claude", "api-response", `Claude responded in ${apiDuration}ms`, {
+    duration: apiDuration,
+    metadata: {
+      inputTokens: message.usage.input_tokens,
+      outputTokens: message.usage.output_tokens,
+    },
+  })
+
+  const responseText = message.content[0].type === "text" ? message.content[0].text : ""
+  const parsedResult = parseAnalysisResponse(responseText)
+  const tokensUsed = (message.usage.input_tokens || 0) + (message.usage.output_tokens || 0)
+
+  return formatAnalysisResult(parsedResult, tokensUsed, "claude-sonnet-4-5-20250929")
+}
+
+// OpenAI analysis with timeout
+async function analyzeWithOpenAIInternal(
+  transcript: string,
+  systemPrompt: string,
+  timeoutMs: number = 90000
+): Promise<AnalysisResult> {
+  const startTime = Date.now()
+
+  await logger.debug("openai", "analyze-start", `Starting OpenAI analysis`, {
+    metadata: {
+      transcriptLength: transcript.length,
+      timeoutMs,
+    },
+  })
+
+  const maxLength = 100000
+  const truncatedTranscript =
+    transcript.length > maxLength
+      ? transcript.substring(0, maxLength) + "\n\n[Transcript truncated due to length...]"
+      : transcript
+
+  const completionPromise = openai.chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 4096,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      {
+        role: "user",
+        content: `TRANSCRIPT:\n${truncatedTranscript}`,
+      },
+    ],
+  })
+
+  const completion = await withTimeout(completionPromise, timeoutMs, "OpenAI API call")
+
+  const apiDuration = Date.now() - startTime
+  await logger.info("openai", "api-response", `OpenAI responded in ${apiDuration}ms`, {
+    duration: apiDuration,
+    metadata: {
+      promptTokens: completion.usage?.prompt_tokens,
+      completionTokens: completion.usage?.completion_tokens,
+    },
+  })
+
+  const responseText = completion.choices[0]?.message?.content || ""
+  const parsedResult = parseAnalysisResponse(responseText)
+  const tokensUsed = (completion.usage?.prompt_tokens || 0) + (completion.usage?.completion_tokens || 0)
+
+  return formatAnalysisResult(parsedResult, tokensUsed, "gpt-4o")
+}
+
+// Main analysis function with fallback
+export async function analyzeWithClaude(
+  transcript: string,
+  systemPrompt: string
+): Promise<AnalysisResult> {
+  const startTime = Date.now()
+  const TIMEOUT_MS = 90000 // 90 seconds
+
+  // Try Claude first
   try {
-    await logger.debug("claude", "api-call", `Calling Anthropic API with model claude-sonnet-4-5-20250929`)
-
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 4096,
-      messages: [
-        {
-          role: "user",
-          content: `${systemPrompt}\n\nTRANSCRIPT:\n${truncatedTranscript}`,
-        },
-      ],
+    await logger.info("ai", "analysis-attempt", "Attempting analysis with Claude", {
+      metadata: { transcriptLength: transcript.length },
     })
 
-    const apiDuration = Date.now() - startTime
-    await logger.info("claude", "api-response", `Received response from Claude`, {
-      duration: apiDuration,
-      metadata: {
-        inputTokens: message.usage.input_tokens,
-        outputTokens: message.usage.output_tokens,
-        stopReason: message.stop_reason,
-      },
-    })
+    const result = await analyzeWithClaudeInternal(transcript, systemPrompt, TIMEOUT_MS)
 
-    const responseText = message.content[0].type === "text" ? message.content[0].text : ""
-
-    await logger.debug("claude", "response-text", `Response text length: ${responseText.length} chars`, {
-      metadata: { responsePreview: responseText.substring(0, 200) + "..." },
-    })
-
-    // Parse the JSON response
-    let parsedResult: Record<string, unknown> = {}
-    try {
-      // Find JSON in the response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-      if (jsonMatch) {
-        parsedResult = JSON.parse(jsonMatch[0])
-        await logger.debug("claude", "json-parsed", `Successfully parsed JSON response`, {
-          metadata: {
-            hasSummary: !!parsedResult.summary,
-            insightsCount: Array.isArray(parsedResult.keyInsights) ? parsedResult.keyInsights.length : 0,
-            quotesCount: Array.isArray(parsedResult.quotableLines) ? parsedResult.quotableLines.length : 0,
-          },
-        })
-      } else {
-        await logger.warn("claude", "no-json", `No JSON found in response, using raw text as summary`)
-      }
-    } catch (parseError) {
-      const errorMsg = parseError instanceof Error ? parseError.message : "Unknown parse error"
-      await logger.warn("claude", "json-parse-error", `Failed to parse JSON: ${errorMsg}`, {
-        metadata: { error: errorMsg, responsePreview: responseText.substring(0, 500) },
-      })
-      // If parsing fails, create a basic structure from the text
-      parsedResult = {
-        summary: responseText,
-        keyInsights: [],
-        quotableLines: [],
-        relevanceScore: 0.5,
-      }
-    }
-
-    const tokensUsed = (message.usage.input_tokens || 0) + (message.usage.output_tokens || 0)
-
-    const result = {
-      result: parsedResult,
-      summary: (parsedResult.summary as string) || "",
-      keyInsights: (parsedResult.keyInsights as string[]) || [],
-      quotableLines: ((parsedResult.quotableLines as Array<{ quote: string }>) || []).map(
-        (q) => (typeof q === "string" ? q : q.quote)
-      ),
-      relevanceScore: (parsedResult.relevanceScore as number) || 0.5,
-      tokensUsed,
-    }
-
-    const totalDuration = Date.now() - startTime
-    await logger.info("claude", "analyze-complete", `Claude analysis complete`, {
-      duration: totalDuration,
-      metadata: {
-        tokensUsed,
-        summaryLength: result.summary.length,
-        insightsCount: result.keyInsights.length,
-        quotesCount: result.quotableLines.length,
-        relevanceScore: result.relevanceScore,
-      },
+    await logger.info("ai", "analysis-success", `Analysis completed with Claude in ${Date.now() - startTime}ms`, {
+      duration: Date.now() - startTime,
+      metadata: { model: result.model, tokensUsed: result.tokensUsed },
     })
 
     return result
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : "Unknown error"
-    const errorName = error instanceof Error ? error.name : "UnknownError"
-
-    await logger.error("claude", "api-error", `Claude API error: ${errorMsg}`, {
+  } catch (claudeError) {
+    const errorMsg = claudeError instanceof Error ? claudeError.message : "Unknown error"
+    await logger.warn("ai", "claude-failed", `Claude failed: ${errorMsg}, falling back to OpenAI`, {
       duration: Date.now() - startTime,
-      metadata: {
-        errorName,
-        errorMessage: errorMsg,
-        stack: error instanceof Error ? error.stack : undefined,
-      },
+      metadata: { error: errorMsg },
     })
 
-    throw error
+    // Fall back to OpenAI
+    try {
+      await logger.info("ai", "fallback-attempt", "Attempting analysis with OpenAI fallback", {
+        metadata: { transcriptLength: transcript.length },
+      })
+
+      const result = await analyzeWithOpenAIInternal(transcript, systemPrompt, TIMEOUT_MS)
+
+      await logger.info("ai", "analysis-success", `Analysis completed with OpenAI fallback in ${Date.now() - startTime}ms`, {
+        duration: Date.now() - startTime,
+        metadata: { model: result.model, tokensUsed: result.tokensUsed },
+      })
+
+      return result
+    } catch (openaiError) {
+      const openaiErrorMsg = openaiError instanceof Error ? openaiError.message : "Unknown error"
+      await logger.error("ai", "all-providers-failed", `Both Claude and OpenAI failed`, {
+        duration: Date.now() - startTime,
+        metadata: {
+          claudeError: errorMsg,
+          openaiError: openaiErrorMsg,
+        },
+      })
+
+      throw new Error(`Analysis failed with both providers. Claude: ${errorMsg}. OpenAI: ${openaiErrorMsg}`)
+    }
   }
 }
 
-export async function generateSummary(text: string, maxWords: number = 100): Promise<string> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 500,
-    messages: [
-      {
-        role: "user",
-        content: `Summarize the following text in ${maxWords} words or less. Focus on the key points and main takeaways.\n\nTEXT:\n${text}`,
-      },
-    ],
-  })
+// Direct OpenAI analysis (for explicit use)
+export async function analyzeWithOpenAI(
+  transcript: string,
+  systemPrompt: string
+): Promise<AnalysisResult> {
+  return analyzeWithOpenAIInternal(transcript, systemPrompt, 90000)
+}
 
-  return message.content[0].type === "text" ? message.content[0].text : ""
+export async function generateSummary(text: string, maxWords: number = 100): Promise<string> {
+  try {
+    const message = await withTimeout(
+      anthropic.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 500,
+        messages: [
+          {
+            role: "user",
+            content: `Summarize the following text in ${maxWords} words or less. Focus on the key points and main takeaways.\n\nTEXT:\n${text}`,
+          },
+        ],
+      }),
+      30000,
+      "Summary generation"
+    )
+    return message.content[0].type === "text" ? message.content[0].text : ""
+  } catch {
+    // Fallback to OpenAI
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 500,
+      messages: [
+        {
+          role: "user",
+          content: `Summarize the following text in ${maxWords} words or less. Focus on the key points and main takeaways.\n\nTEXT:\n${text}`,
+        },
+      ],
+    })
+    return completion.choices[0]?.message?.content || ""
+  }
 }
 
 export async function suggestTags(text: string): Promise<string[]> {
-  const message = await anthropic.messages.create({
-    model: "claude-sonnet-4-5-20250929",
-    max_tokens: 200,
-    messages: [
-      {
-        role: "user",
-        content: `Based on the following text, suggest 3-5 relevant tags/categories. Return only the tags as a JSON array of strings.\n\nTEXT:\n${text.substring(0, 5000)}`,
-      },
-    ],
-  })
-
-  const responseText = message.content[0].type === "text" ? message.content[0].text : "[]"
-
   try {
+    const message = await withTimeout(
+      anthropic.messages.create({
+        model: "claude-sonnet-4-5-20250929",
+        max_tokens: 200,
+        messages: [
+          {
+            role: "user",
+            content: `Based on the following text, suggest 3-5 relevant tags/categories. Return only the tags as a JSON array of strings.\n\nTEXT:\n${text.substring(0, 5000)}`,
+          },
+        ],
+      }),
+      30000,
+      "Tag suggestion"
+    )
+
+    const responseText = message.content[0].type === "text" ? message.content[0].text : "[]"
     const match = responseText.match(/\[[\s\S]*\]/)
     if (match) {
       return JSON.parse(match[0])
     }
   } catch {
-    // Fallback
+    // Fallback - return empty array
   }
 
   return []

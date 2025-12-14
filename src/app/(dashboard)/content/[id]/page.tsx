@@ -21,6 +21,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Loader2,
+  ChevronLeft,
 } from "lucide-react"
 import { formatDistanceToNow, format } from "date-fns"
 import { toast } from "sonner"
@@ -146,7 +147,7 @@ export default function ContentDetailPage({
       setPollCount((prev) => prev + 1)
 
       // Update progress simulation while waiting
-      setAnalysisProgress((prev) => Math.min(prev + 5, 90))
+      setAnalysisProgress((prev) => Math.min(prev + 3, 90))
 
       const data = await fetchContent()
 
@@ -159,8 +160,8 @@ export default function ContentDetailPage({
         setIsAnalyzing(false)
         toast.success("Analysis complete!")
         clearInterval(pollInterval)
-      } else if (pollCount > 60) {
-        // Timeout after ~2 minutes
+      } else if (pollCount > 90) {
+        // Timeout after ~3 minutes (90 * 2 seconds)
         setAnalysisError("Analysis is taking longer than expected. Check logs for details.")
         setIsAnalyzing(false)
         clearInterval(pollInterval)
@@ -190,7 +191,7 @@ export default function ContentDetailPage({
       const data = await res.json()
 
       if (res.ok) {
-        toast.info("Analysis started - this may take 30-60 seconds...")
+        toast.info("Analysis started - this may take up to 90 seconds...")
         setAnalysisSteps((prev) =>
           prev.map((step, i) =>
             i === 0 ? { ...step, status: "complete" as const } :
@@ -232,7 +233,7 @@ export default function ContentDetailPage({
       if (data.success) {
         toast.success(`Transcript fetched: ${data.transcript?.wordCount || 0} words`)
         if (data.analysisTriggered) {
-          toast.info("Analysis started automatically - this may take 30-60 seconds...")
+          toast.info("Analysis started automatically - this may take up to 90 seconds...")
           setIsAnalyzing(true)
           setAnalysisProgress(10)
           setAnalysisSteps([
@@ -257,7 +258,7 @@ export default function ContentDetailPage({
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4 p-4">
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-[600px]" />
       </div>
@@ -276,178 +277,185 @@ export default function ContentDetailPage({
   }
 
   const statusColors: Record<string, string> = {
-    PENDING: "bg-yellow-500",
-    PROCESSING: "bg-blue-500",
-    ANALYZED: "bg-green-500",
-    FAILED: "bg-red-500",
-    ARCHIVED: "bg-gray-500",
+    PENDING: "bg-yellow-500/80",
+    PROCESSING: "bg-blue-500/80",
+    ANALYZED: "bg-green-500/80",
+    FAILED: "bg-red-500/80",
+    ARCHIVED: "bg-gray-500/80",
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div className="space-y-2">
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/content">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Content
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold">{content.title}</h1>
-          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <Badge variant="outline">{content.source.name}</Badge>
-            <Badge className={statusColors[content.status]}>{content.status}</Badge>
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" />
-              {formatDistanceToNow(new Date(content.publishedAt))} ago
-            </span>
-            {content.transcript && (
-              <span className="flex items-center gap-1">
-                <FileText className="h-3 w-3" />
-                {content.transcript.wordCount.toLocaleString()} words
-              </span>
-            )}
+    <div className="min-h-screen">
+      {/* Compact Header */}
+      <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Back + Title */}
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <Button variant="ghost" size="sm" asChild className="shrink-0 -ml-2">
+                <Link href="/content" className="flex items-center gap-1">
+                  <ChevronLeft className="h-4 w-4" />
+                  <span className="hidden sm:inline">Content</span>
+                </Link>
+              </Button>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg font-semibold truncate leading-tight">{content.title}</h1>
+                <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                  <Badge variant="outline" className="text-xs px-1.5 py-0">{content.source.name}</Badge>
+                  <Badge className={`${statusColors[content.status]} text-xs px-1.5 py-0`}>{content.status}</Badge>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {formatDistanceToNow(new Date(content.publishedAt))} ago
+                  </span>
+                  {content.transcript && (
+                    <span className="flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      {content.transcript.wordCount.toLocaleString()} words
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Actions */}
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="outline" size="sm" asChild>
+                <a href={content.originalUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="h-4 w-4 sm:mr-1.5" />
+                  <span className="hidden sm:inline">Original</span>
+                </a>
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || !content.transcript}
+                className="min-w-[100px]"
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                    <span className="hidden sm:inline">Analyzing</span>
+                  </>
+                ) : (
+                  <>
+                    <Brain className="h-4 w-4 sm:mr-1.5" />
+                    <span className="hidden sm:inline">Analyze</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <a
-              href={content.originalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              Open Original
-            </a>
-          </Button>
-          <Button onClick={handleAnalyze} disabled={isAnalyzing}>
-            {isAnalyzing ? (
-              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Brain className="mr-2 h-4 w-4" />
-            )}
-            {isAnalyzing ? "Analyzing..." : "Analyze"}
-          </Button>
+
+          {/* Tags row */}
+          {content.tags.length > 0 && (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40">
+              <Tag className="h-3 w-3 text-muted-foreground" />
+              {content.tags.map((tag) => (
+                <Badge key={tag.id} variant="secondary" className="text-xs px-1.5 py-0">
+                  {tag.name}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Tags */}
-      {content.tags.length > 0 && (
-        <div className="flex items-center gap-2">
-          <Tag className="h-4 w-4 text-muted-foreground" />
-          {content.tags.map((tag) => (
-            <Badge key={tag.id} variant="secondary">
-              {tag.name}
-            </Badge>
-          ))}
-        </div>
-      )}
+      {/* Main Content - 1/3 + 2/3 Layout */}
+      <div className="flex flex-col lg:flex-row gap-4 p-4">
+        {/* Left: Transcript (1/3 width) */}
+        <div className="lg:w-1/3 shrink-0">
+          <Card className="h-[calc(100vh-180px)] flex flex-col">
+            <CardHeader className="py-2 px-3 border-b shrink-0">
+              <CardTitle className="text-sm font-medium">Transcript</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 p-0 overflow-hidden">
+              {content.transcript ? (
+                <TranscriptViewer
+                  segments={content.transcript.segments}
+                  fullText={content.transcript.fullText}
+                  videoId={content.externalId}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full text-center p-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">No transcript available</p>
+                  <Button size="sm" onClick={handleFetchTranscript} disabled={isFetchingTranscript}>
+                    {isFetchingTranscript ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
+                        Fetching...
+                      </>
+                    ) : (
+                      "Fetch Transcript"
+                    )}
+                  </Button>
 
-      {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Transcript */}
-        <Card className="h-[700px] flex flex-col">
-          <CardHeader>
-            <CardTitle>Transcript</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 p-0">
-            {content.transcript ? (
-              <TranscriptViewer
-                segments={content.transcript.segments}
-                fullText={content.transcript.fullText}
-                videoId={content.externalId}
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center p-4 space-y-4">
-                <p className="text-muted-foreground">
-                  No transcript available
-                </p>
-                <Button onClick={handleFetchTranscript} disabled={isFetchingTranscript}>
-                  {isFetchingTranscript ? (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                      Fetching...
-                    </>
-                  ) : (
-                    "Fetch Transcript"
-                  )}
-                </Button>
-
-                {/* Error Display */}
-                {transcriptError && (
-                  <div className="w-full max-w-md p-4 bg-red-950 border border-red-800 rounded-lg text-left">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5 flex-shrink-0" />
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-red-400">Transcript Error</p>
-                        <p className="text-sm text-red-300">{transcriptError}</p>
+                  {transcriptError && (
+                    <div className="w-full max-w-sm p-3 bg-red-950/50 border border-red-800/50 rounded-lg text-left">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-red-400">Error</p>
+                          <p className="text-xs text-red-300">{transcriptError}</p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Debug Info */}
-                {transcriptDebug && (
-                  <div className="w-full max-w-md p-4 bg-zinc-900 border border-zinc-700 rounded-lg text-left">
-                    <p className="text-xs font-medium text-zinc-400 mb-2">Debug Info</p>
-                    <div className="space-y-1 text-xs font-mono text-zinc-500">
-                      <p>Video ID: {transcriptDebug.videoId}</p>
-                      <p>Timestamp: {transcriptDebug.timestamp}</p>
-                      <p>Items Found: {transcriptDebug.itemCount ?? "N/A"}</p>
-                      {transcriptDebug.errorType && (
-                        <p className="text-red-400">Error Type: {transcriptDebug.errorType}</p>
-                      )}
-                      {transcriptDebug.errorMessage && (
-                        <p className="text-red-400 break-all">Error: {transcriptDebug.errorMessage}</p>
-                      )}
+                  {transcriptDebug && (
+                    <div className="w-full max-w-sm p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-lg text-left">
+                      <p className="text-xs font-medium text-zinc-400 mb-1">Debug</p>
+                      <div className="space-y-0.5 text-xs font-mono text-zinc-500">
+                        <p>Video: {transcriptDebug.videoId}</p>
+                        <p>Items: {transcriptDebug.itemCount ?? "N/A"}</p>
+                        {transcriptDebug.errorType && (
+                          <p className="text-red-400">Type: {transcriptDebug.errorType}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <p className="text-xs text-zinc-600">
-                  Video ID: {content.externalId}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                  <p className="text-xs text-zinc-600">ID: {content.externalId}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
 
-        {/* Right: Analysis */}
-        <div className="space-y-6">
+        {/* Right: Analysis (2/3 width) */}
+        <div className="flex-1 space-y-4">
           {/* Analysis Status Panel - shown when analyzing */}
           {(isAnalyzing || analysisError) && (
-            <Card className="border-2 border-primary/50">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg flex items-center gap-2">
+            <Card className="border-primary/30 bg-primary/5">
+              <CardHeader className="py-2 px-3">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
                   {isAnalyzing ? (
                     <>
-                      <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                      <Loader2 className="h-4 w-4 animate-spin text-primary" />
                       Analysis in Progress
                     </>
                   ) : analysisError ? (
                     <>
-                      <AlertCircle className="h-5 w-5 text-red-500" />
+                      <AlertCircle className="h-4 w-4 text-red-500" />
                       Analysis Error
                     </>
                   ) : null}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="py-2 px-3 space-y-3">
                 {isAnalyzing && (
                   <>
-                    <Progress value={analysisProgress} className="h-2" />
-                    <div className="space-y-2">
+                    <Progress value={analysisProgress} className="h-1.5" />
+                    <div className="flex items-center gap-4 text-xs">
                       {analysisSteps.map((step, index) => (
-                        <div key={index} className="flex items-center gap-2 text-sm">
+                        <div key={index} className="flex items-center gap-1.5">
                           {step.status === "complete" ? (
-                            <CheckCircle2 className="h-4 w-4 text-green-500" />
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
                           ) : step.status === "running" ? (
-                            <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
                           ) : step.status === "error" ? (
-                            <AlertCircle className="h-4 w-4 text-red-500" />
+                            <AlertCircle className="h-3.5 w-3.5 text-red-500" />
                           ) : (
-                            <div className="h-4 w-4 rounded-full border-2 border-muted" />
+                            <div className="h-3.5 w-3.5 rounded-full border border-muted" />
                           )}
                           <span className={step.status === "running" ? "text-primary font-medium" : "text-muted-foreground"}>
                             {step.name}
@@ -456,17 +464,17 @@ export default function ContentDetailPage({
                       ))}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      AI analysis typically takes 30-60 seconds for long transcripts
+                      Analysis typically takes 30-90 seconds. Using Claude or OpenAI as backup.
                     </p>
                   </>
                 )}
                 {analysisError && (
-                  <div className="p-3 bg-red-950/50 border border-red-800 rounded-lg">
-                    <p className="text-sm text-red-400">{analysisError}</p>
+                  <div className="flex items-center justify-between p-2 bg-red-950/30 border border-red-800/30 rounded">
+                    <p className="text-xs text-red-400">{analysisError}</p>
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      className="mt-2"
+                      className="h-6 text-xs"
                       onClick={() => {
                         setAnalysisError(null)
                         setAnalysisSteps([])
@@ -480,33 +488,34 @@ export default function ContentDetailPage({
             </Card>
           )}
 
-          <AnalysisDisplay
-            analyses={content.analyses}
-            onReanalyze={handleAnalyze}
-          />
+          {/* Analysis Results */}
+          <div className="h-[calc(100vh-180px-${(isAnalyzing || analysisError) ? '140px' : '0px'})]">
+            <AnalysisDisplay
+              analyses={content.analyses}
+              onReanalyze={handleAnalyze}
+            />
+          </div>
 
           {/* Usage History */}
           {content.usageHistory.length > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Usage History</CardTitle>
+              <CardHeader className="py-2 px-3">
+                <CardTitle className="text-sm font-medium">Usage History</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
+              <CardContent className="py-2 px-3">
+                <div className="space-y-1.5">
                   {content.usageHistory.map((usage) => (
                     <div
                       key={usage.id}
-                      className="flex items-center justify-between p-2 rounded border"
+                      className="flex items-center justify-between p-2 rounded border text-sm"
                     >
                       <div>
-                        <p className="font-medium">{usage.destination}</p>
+                        <p className="font-medium text-sm">{usage.destination}</p>
                         {usage.notes && (
-                          <p className="text-sm text-muted-foreground">
-                            {usage.notes}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{usage.notes}</p>
                         )}
                       </div>
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {format(new Date(usage.usedAt), "MMM d, yyyy")}
                       </span>
                     </div>

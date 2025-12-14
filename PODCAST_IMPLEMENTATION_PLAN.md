@@ -1,31 +1,262 @@
-# Podcast Content Source Implementation Plan
+# Podcast Content Source Implementation Plan v2
 
 ## Executive Summary
 
-This plan extends Disruption Intel to support podcast content sources alongside YouTube videos. The architecture is designed to be extensible for future content types (newsletters, RSS feeds, etc.).
+Expand Disruption Intel to support podcast content sources alongside YouTube videos, with a unified content management interface designed for future expansion (Twitter, newsletters, etc.). Focus on RSS-based transcript acquisition without ASR infrastructure.
+
+---
+
+## Scope Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| ASR Service | Deferred | Focus on existing transcripts first |
+| Historical Import | Last 10 episodes | Manageable initial dataset |
+| Transcript Priority | RSS > YouTube | More reliable, better quality |
+| Audio Storage | Not needed | No ASR means no audio processing |
+| Speaker Diarization | Natural from RSS | Will appear in transcript if available |
+| UI Scope | Full robust UI | Future-proof for Twitter, newsletters |
+
+---
+
+## UI/UX Vision: Unified Content Intelligence Platform
+
+### Design Principles
+
+1. **Source-Agnostic Content View** - All content (videos, podcasts, future tweets) in unified interface
+2. **Source Management Hub** - Easy to add/manage diverse source types
+3. **Smart Filtering** - Filter by source type, status, relevance, date range
+4. **Professional Aesthetic** - Clean, modern, data-rich interface
+5. **Scalable Architecture** - UI patterns that accommodate new source types
+
+### Information Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  DISRUPTION INTEL                                    [User] [Settings]│
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌──────────┐                                                        │
+│  │ Dashboard│  Quick stats, recent activity, alerts                  │
+│  ├──────────┤                                                        │
+│  │ Content  │  ← Unified view of ALL content (videos + podcasts)     │
+│  ├──────────┤                                                        │
+│  │ Sources  │  ← Manage YouTube channels, Podcast feeds, (Twitter)   │
+│  ├──────────┤                                                        │
+│  │ Search   │  Full-text search across all transcripts               │
+│  ├──────────┤                                                        │
+│  │ Insights │  AI-generated trends, key quotes, signals (future)     │
+│  ├──────────┤                                                        │
+│  │ Settings │  Prompts, API keys, preferences                        │
+│  └──────────┘                                                        │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Sources Page Redesign
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Sources                                          [+ Add Source ▼]   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Filter: [All Types ▼] [Active ▼]           Search: [____________]   │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ 📺 YOUTUBE CHANNELS                                    4 sources │ │
+│  ├─────────────────────────────────────────────────────────────────┤ │
+│  │ ┌─────────────────────┐ ┌─────────────────────┐                 │ │
+│  │ │ [img] All-In Pod    │ │ [img] Lex Fridman   │ ...             │ │
+│  │ │ 24 videos │ Active  │ │ 156 videos │ Active │                 │ │
+│  │ │ Last: 2 days ago    │ │ Last: 5 days ago    │                 │ │
+│  │ └─────────────────────┘ └─────────────────────┘                 │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ 🎙️ PODCASTS                                          18 sources │ │
+│  ├─────────────────────────────────────────────────────────────────┤ │
+│  │ ┌─────────────────────┐ ┌─────────────────────┐                 │ │
+│  │ │ [img] 20 VC         │ │ [img] Hard Fork     │ ...             │ │
+│  │ │ 10 episodes │ Active│ │ 10 episodes │ Active│                 │ │
+│  │ │ Last: 1 day ago     │ │ Last: 3 days ago    │                 │ │
+│  │ └─────────────────────┘ └─────────────────────┘                 │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────────┐ │
+│  │ 🐦 TWITTER FEEDS (Coming Soon)                         0 sources │ │
+│  └─────────────────────────────────────────────────────────────────┘ │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Content Page Redesign
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Content                                                             │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │ Type: [All ▼] [📺 Videos] [🎙️ Podcasts]                       │   │
+│  │ Status: [All ▼] Source: [All ▼] Date: [Last 30 days ▼]        │   │
+│  │ Sort: [Newest ▼]                    Search: [______________]   │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │ │ Type │ Title                    │ Source   │ Status │ Date  │   │
+│  │ ├──────┼──────────────────────────┼──────────┼────────┼───────│   │
+│  │ │ 🎙️   │ AI Safety with Dario... │ 20 VC    │ ✅ Done │ Dec 12│   │
+│  │ │ 📺   │ The Future of AGI       │ Lex F.   │ ✅ Done │ Dec 11│   │
+│  │ │ 🎙️   │ Scaling Laws Deep Dive  │ Dwarkesh │ ⏳ Proc │ Dec 10│   │
+│  │ │ 📺   │ OpenAI DevDay Recap     │ All-In   │ ❌ Fail │ Dec 9 │   │
+│  │ │ 🎙️   │ Google Gemini Launch    │ Hard Fork│ ✅ Done │ Dec 8 │   │
+│  └───────────────────────────────────────────────────────────────┘   │
+│                                                                      │
+│  Showing 1-25 of 342 items                      [< 1 2 3 ... 14 >]   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Add Source Dialog (Multi-Type)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Add New Source                                              [X]     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Select Source Type:                                                 │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │     📺       │  │     🎙️       │  │     🐦       │               │
+│  │   YouTube    │  │   Podcast    │  │   Twitter    │               │
+│  │   Channel    │  │    Feed      │  │  (Coming)    │               │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+│       ▲ Selected                                                     │
+│                                                                      │
+│  ─────────────────────────────────────────────────────────────────   │
+│                                                                      │
+│  YouTube Channel URL:                                                │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │ https://youtube.com/@lexfridman                             │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │ ✓ Lex Fridman Podcast                                       │     │
+│  │   @lexfridman • 4.2M subscribers • 430 videos               │     │
+│  │   Latest: "Sam Altman: OpenAI CEO on GPT-5..." (2 days ago) │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                                                                      │
+│  Check Frequency: [Daily ▼]                                          │
+│                                                                      │
+│                                    [Cancel]  [Add Source]            │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Podcast Source Dialog
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  Add New Source                                              [X]     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  Select Source Type:                                                 │
+│                                                                      │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐               │
+│  │     📺       │  │     🎙️       │  │     🐦       │               │
+│  │   YouTube    │  │   Podcast    │  │   Twitter    │               │
+│  │   Channel    │  │    Feed      │  │  (Coming)    │               │
+│  └──────────────┘  └──────────────┘  └──────────────┘               │
+│                         ▲ Selected                                   │
+│                                                                      │
+│  ─────────────────────────────────────────────────────────────────   │
+│                                                                      │
+│  Podcast RSS Feed or Website URL:                                    │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │ https://www.thetwentyminutevc.com/                          │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│  [Discover Feed]                                                     │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │ ✓ 20VC with Harry Stebbings                                 │     │
+│  │   RSS: https://feeds.megaphone.fm/20vc                      │     │
+│  │   Episodes: 2,847 • Latest: "Dario Amodei..." (1 day ago)   │     │
+│  │                                                              │     │
+│  │   Transcript Availability:                                   │     │
+│  │   ├─ RSS Transcript Tag: ✓ Available                        │     │
+│  │   ├─ Episode Page Scraping: ✓ Likely available              │     │
+│  │   └─ YouTube Mirror: ✓ Channel linked                       │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                                                                      │
+│  Import Options:                                                     │
+│  ○ Latest episode only                                               │
+│  ● Last 10 episodes (recommended)                                    │
+│  ○ Last 30 episodes                                                  │
+│  ○ Custom date range                                                 │
+│                                                                      │
+│  Check Frequency: [Daily ▼]                                          │
+│                                                                      │
+│                                    [Cancel]  [Add Source]            │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Content Detail Page (Podcast Episode)
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  ← Back to Content                                                   │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ 🎙️ PODCAST EPISODE                                             │  │
+│  │                                                                 │  │
+│  │ The Future of AI Safety with Dario Amodei                      │  │
+│  │                                                                 │  │
+│  │ 20VC with Harry Stebbings • December 12, 2024 • 58 min         │  │
+│  │                                                                 │  │
+│  │ [▶ Listen on 20VC.com]  [📋 Copy Link]  [🔄 Re-analyze]        │  │
+│  │                                                                 │  │
+│  │ Status: ✅ Analyzed • Transcript: RSS (Official)               │  │
+│  │ Relevance Score: 94/100                                        │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ [Summary] [Key Insights] [Quotes] [Transcript] [Raw JSON]    │    │
+│  ├──────────────────────────────────────────────────────────────┤    │
+│  │                                                               │    │
+│  │ SUMMARY                                                       │    │
+│  │ ────────                                                      │    │
+│  │ Dario Amodei, CEO of Anthropic, discusses the company's      │    │
+│  │ approach to AI safety, the race to AGI, and why he believes  │    │
+│  │ constitutional AI represents a breakthrough in alignment...   │    │
+│  │                                                               │    │
+│  │ KEY INSIGHTS                                                  │    │
+│  │ ────────────                                                  │    │
+│  │ • Anthropic expects to reach AGI-level capabilities within   │    │
+│  │   2-3 years, but emphasizes safety-first development         │    │
+│  │ • Constitutional AI has shown 40% improvement in avoiding    │    │
+│  │   harmful outputs compared to RLHF alone                     │    │
+│  │ • The "race to the bottom" narrative is overblown...         │    │
+│  │                                                               │    │
+│  └──────────────────────────────────────────────────────────────┘    │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Phase 1: Database Schema Extensions
 
-### 1.1 Extend Transcript Source Enum
+### 1.1 Add ContentType Enum
 **File:** `prisma/schema.prisma`
 
-```prisma
-// Expand the Transcript model's source field to support:
-// Current: "youtube_auto" | "whisper" | "manual"
-// New:     + "podcast_rss" | "podcast_scraped" | "youtube_captions" | "asr_whisper"
-```
-
-### 1.2 Add Content Type Field
-**File:** `prisma/schema.prisma`
-
-Add `contentType` enum and field to Content model:
 ```prisma
 enum ContentType {
   VIDEO
   PODCAST_EPISODE
-  ARTICLE
+  ARTICLE          // Future: newsletters
+  SOCIAL_POST      // Future: Twitter
 }
 
 model Content {
@@ -34,37 +265,38 @@ model Content {
 }
 ```
 
-### 1.3 Add Transcript Strategy Configuration
-**File:** `prisma/schema.prisma`
-
-Source metadata should track transcription preferences:
+### 1.2 Extend Transcript Source Options
+Track where transcripts came from for debugging/quality:
 ```prisma
-// Already exists as JSON: metadata field on Source
-// Will store: { transcriptStrategy: ["rss", "scrape", "youtube", "asr"] }
+// Transcript.source field will accept:
+// "youtube_auto" | "podcast_rss" | "podcast_scraped" | "manual"
 ```
 
-### 1.4 Migration
-- Run `npx prisma migrate dev --name add-podcast-support`
-- Update existing Content records to `contentType: VIDEO`
+### 1.3 Migration
+```bash
+npx prisma migrate dev --name add-content-type-and-podcast-support
+```
 
 ---
 
-## Phase 2: Podcast Ingestion Layer
+## Phase 2: Podcast Ingestion Module
 
 ### 2.1 Create Podcast Module
-**File:** `src/lib/ingestion/podcast.ts` (NEW)
+**File:** `src/lib/ingestion/podcast.ts`
 
 ```typescript
+import Parser from 'rss-parser'
+
 interface PodcastEpisode {
-  guid: string              // Unique episode identifier
+  guid: string
   title: string
   description: string
   publishedAt: Date
-  duration: number          // seconds
-  audioUrl: string          // enclosure URL
-  episodeUrl: string        // episode page URL
+  duration: number
+  audioUrl: string
+  episodeUrl: string
   imageUrl?: string
-  transcriptUrl?: string    // from <podcast:transcript> tag
+  transcriptUrl?: string  // From <podcast:transcript> tag
 }
 
 interface PodcastFeed {
@@ -74,110 +306,103 @@ interface PodcastFeed {
   imageUrl?: string
   feedUrl: string
   websiteUrl: string
+  language?: string
   episodes: PodcastEpisode[]
 }
 
-// Functions to implement:
 export async function parsePodcastFeed(feedUrl: string): Promise<PodcastFeed>
-export async function discoverPodcastFeed(websiteUrl: string): Promise<string | null>
+export async function discoverFeedFromWebsite(websiteUrl: string): Promise<string | null>
 export async function getLatestEpisodes(feedUrl: string, limit?: number): Promise<PodcastEpisode[]>
+export async function fetchRSSTranscript(transcriptUrl: string): Promise<string | null>
 ```
 
-### 2.2 Dependencies to Add
+### 2.2 Dependencies
 ```bash
-npm install feedparser-promised rss-parser fast-xml-parser
+npm install rss-parser cheerio
 ```
 
-### 2.3 RSS Feed Parsing Implementation
-- Use `rss-parser` for standard RSS parsing
-- Look for `<podcast:transcript>` tags (Podcasting 2.0 namespace)
-- Extract episode metadata: guid, title, description, enclosure (audio URL)
-- Handle iTunes namespace for duration, image, etc.
+### 2.3 RSS Parsing with Podcasting 2.0 Support
+- Parse standard RSS/Atom feeds
+- Extract `<podcast:transcript>` tags (Podcasting 2.0 namespace)
+- Handle iTunes namespace for podcast metadata
+- Support multiple transcript formats (plain text, VTT, SRT, JSON)
 
 ---
 
-## Phase 3: Multi-Tier Transcript Acquisition
+## Phase 3: Transcript Acquisition Strategies
 
-### 3.1 Refactor Transcript Module
+### 3.1 Strategy Priority (No ASR)
+
+```
+For Podcasts:
+1. RSS <podcast:transcript> tag → Direct URL to transcript file
+2. Scrape episode page → Look for transcript sections
+3. YouTube fallback → If podcast has YouTube mirror (last resort)
+
+For YouTube Videos:
+1. Existing YouTube transcript logic (unchanged)
+```
+
+### 3.2 Refactor Transcript Module
 **File:** `src/lib/ingestion/transcript.ts`
 
 ```typescript
-type TranscriptStrategy =
-  | "podcast_rss"      // Tier 1: Pull from RSS <podcast:transcript>
-  | "podcast_scrape"   // Tier 2: Scrape episode page
-  | "youtube_captions" // Tier 3: YouTube captions
-  | "asr_whisper"      // Tier 4: ASR transcription
+type TranscriptSource =
+  | "youtube_auto"
+  | "podcast_rss"
+  | "podcast_scraped"
+  | "youtube_fallback"
+  | "manual"
 
 interface TranscriptOptions {
   contentType: "video" | "podcast"
-  strategies?: TranscriptStrategy[]  // Priority order
-  audioUrl?: string                  // For ASR fallback
-  episodeUrl?: string                // For scraping
-  transcriptUrl?: string             // Direct URL from RSS
+  transcriptUrl?: string      // Direct URL from RSS
+  episodeUrl?: string         // For scraping fallback
+  youtubeVideoId?: string     // For YouTube fallback
 }
 
-export async function fetchTranscriptWithFallback(
+export async function fetchTranscriptForContent(
   contentId: string,
-  videoId: string | null,
+  externalId: string,
   options: TranscriptOptions
 ): Promise<TranscriptResult | null>
 ```
 
-### 3.2 Implement Transcript Strategy Handlers
-**File:** `src/lib/ingestion/transcript-strategies/` (NEW directory)
-
-```
-transcript-strategies/
-├── index.ts           # Strategy orchestrator
-├── rss-transcript.ts  # Fetch from <podcast:transcript> URL
-├── page-scraper.ts    # Scrape episode page for transcript
-├── youtube.ts         # Existing YouTube logic (refactored)
-└── asr.ts             # Whisper ASR transcription
-```
-
 ### 3.3 Page Scraping Strategy
-**Dependencies:**
-```bash
-npm install cheerio playwright  # cheerio for simple scraping, playwright for JS-heavy pages
-```
+**File:** `src/lib/ingestion/transcript-strategies/page-scraper.ts`
 
-**Implementation:**
-- Pattern matching for transcript sections
-- Look for: "Transcript", "Full transcript", "Read transcript"
-- Check `<details>/<summary>` blocks
-- Extract JSON-LD structured data
-
-### 3.4 ASR Transcription Strategy
-**Options:**
-1. **External Service:** Use AssemblyAI, Deepgram, or OpenAI Whisper API
-2. **Self-Hosted:** Deploy Whisper model (requires GPU)
-
-**Recommended:** Start with OpenAI Whisper API for simplicity:
 ```typescript
-import OpenAI from 'openai'
+import * as cheerio from 'cheerio'
 
-async function transcribeWithWhisper(audioUrl: string): Promise<TranscriptResult>
+// Look for common transcript patterns:
+// - Links with text: "Transcript", "Full transcript", "Read transcript"
+// - <details>/<summary> blocks containing transcript
+// - Sections with id/class containing "transcript"
+// - JSON-LD structured data
+
+export async function scrapeTranscriptFromPage(episodeUrl: string): Promise<string | null>
 ```
 
 ---
 
 ## Phase 4: Inngest Job Extensions
 
-### 4.1 Modify Source Check Handler
+### 4.1 Extend Source Checker
 **File:** `src/inngest/functions/check-sources.ts`
 
+Add PODCAST handling alongside existing YouTube logic:
+
 ```typescript
-// Add podcast handling to checkSource function:
 if (source.type === "YOUTUBE_CHANNEL") {
-  // existing code
+  // existing YouTube logic
 } else if (source.type === "PODCAST") {
   const episodes = await step.run("fetch-podcast-episodes", async () => {
     const { getLatestEpisodes } = await import("@/lib/ingestion/podcast")
     return getLatestEpisodes(source.url, 10)
   })
 
-  // Create Content records for new episodes
   for (const episode of episodes) {
+    // Check if already exists
     const exists = await prisma.content.findFirst({
       where: { sourceId: source.id, externalId: episode.guid }
     })
@@ -202,7 +427,6 @@ if (source.type === "YOUTUBE_CHANNEL") {
         }
       })
 
-      // Trigger processing
       await inngest.send({
         name: "content/process",
         data: { contentId: content.id }
@@ -212,30 +436,26 @@ if (source.type === "YOUTUBE_CHANNEL") {
 }
 ```
 
-### 4.2 Modify Content Processing
-**File:** `src/inngest/functions/check-sources.ts` or new file
+### 4.2 Extend Content Processor
+Handle podcast transcript fetching:
 
-Extend `processContent` to handle podcasts:
 ```typescript
-// Determine content type from source
 const source = await prisma.source.findUnique({ where: { id: content.sourceId } })
 
 if (source.type === "YOUTUBE_CHANNEL") {
   // existing YouTube transcript logic
 } else if (source.type === "PODCAST") {
-  transcript = await fetchTranscriptWithFallback(content.id, null, {
+  transcript = await fetchTranscriptForContent(content.id, content.externalId, {
     contentType: "podcast",
-    strategies: source.metadata?.transcriptStrategy || ["podcast_rss", "podcast_scrape", "asr_whisper"],
-    audioUrl: content.metadata?.audioUrl,
-    episodeUrl: content.originalUrl,
-    transcriptUrl: content.metadata?.transcriptUrl
+    transcriptUrl: content.metadata?.transcriptUrl,
+    episodeUrl: content.originalUrl
   })
 }
 ```
 
 ---
 
-## Phase 5: API Route Extensions
+## Phase 5: API Extensions
 
 ### 5.1 Source Discovery Endpoint
 **File:** `src/app/api/sources/discover/route.ts` (NEW)
@@ -243,212 +463,181 @@ if (source.type === "YOUTUBE_CHANNEL") {
 ```typescript
 // POST /api/sources/discover
 // Body: { url: string, type: "PODCAST" | "YOUTUBE_CHANNEL" }
-// Returns: { name, description, feedUrl, latestEpisodes[] }
-
-// Validates podcast RSS feeds before adding as source
-// Returns preview of what would be ingested
+// Returns preview of source before adding
 ```
 
-### 5.2 Transcript Retry Endpoint
-**File:** `src/app/api/content/[id]/retry-transcript/route.ts` (NEW)
+### 5.2 Podcast Feed Validation
+**File:** `src/app/api/sources/validate-podcast/route.ts` (NEW)
 
 ```typescript
-// POST /api/content/{id}/retry-transcript
-// Body: { strategy?: TranscriptStrategy }
-// Attempts alternative transcript strategies
+// POST /api/sources/validate-podcast
+// Body: { url: string }
+// Returns: feed info, transcript availability check, episode count
 ```
 
-### 5.3 Bulk Import Endpoint
-**File:** `src/app/api/sources/[id]/import-episodes/route.ts` (NEW)
+### 5.3 Extend Sources POST
+**File:** `src/app/api/sources/route.ts`
 
-```typescript
-// POST /api/sources/{id}/import-episodes
-// Body: { limit?: number, startDate?: string }
-// Imports historical episodes from a podcast feed
-```
+Add validation for podcast RSS feeds and import options.
 
 ---
 
-## Phase 6: UI Modifications
+## Phase 6: UI Implementation
 
-### 6.1 Source Management Updates
-**File:** `src/components/sources/add-source-dialog.tsx`
+### 6.1 New/Modified Components
 
-- Add source type selector (YouTube Channel, Podcast, RSS, Manual)
-- Show type-specific fields:
-  - **YouTube:** Channel URL
-  - **Podcast:** RSS Feed URL or Website URL (with auto-discovery)
-  - **RSS:** Feed URL
-- Add transcript strategy configuration for podcasts
+| Component | Status | Description |
+|-----------|--------|-------------|
+| `sources/source-type-selector.tsx` | NEW | Visual type picker (YouTube, Podcast, Twitter placeholder) |
+| `sources/add-source-dialog.tsx` | MODIFY | Multi-type support with type-specific forms |
+| `sources/podcast-preview.tsx` | NEW | Shows feed info before adding |
+| `sources/source-card.tsx` | MODIFY | Type-specific icons and metadata |
+| `content/content-table.tsx` | MODIFY | Add content type column/filter |
+| `content/content-type-badge.tsx` | NEW | Visual badge for VIDEO/PODCAST |
+| `content/transcript-source-badge.tsx` | NEW | Shows transcript origin (RSS, scraped, etc.) |
+| `layout/sidebar.tsx` | MODIFY | Updated navigation structure |
 
-### 6.2 Source Card Updates
-**File:** `src/components/sources/source-card.tsx`
+### 6.2 Page Updates
 
-- Show content type icon (video vs podcast icon)
-- Display podcast-specific metadata (episode count, feed URL)
-- Type-specific action buttons
-
-### 6.3 Content List Updates
-**File:** `src/components/content/content-table.tsx`
-
-- Add content type column/indicator
-- Show appropriate icon (video vs podcast)
-- Filter by content type
-
-### 6.4 Content Detail Page Updates
-**File:** `src/app/(dashboard)/content/[id]/page.tsx`
-
-- Show podcast-specific metadata (audio player, episode URL)
-- Display transcript source with fallback status
-- Option to retry transcript with different strategy
-
-### 6.5 New Components Needed
-
-```
-src/components/
-├── content/
-│   └── audio-player.tsx        # Simple audio player for podcasts
-├── sources/
-│   ├── podcast-preview.tsx     # Preview before adding podcast source
-│   └── transcript-config.tsx   # Configure transcript strategies
-└── ui/
-    └── content-type-badge.tsx  # Visual indicator for content type
-```
+| Page | Changes |
+|------|---------|
+| `/sources` | Grouped by type, visual cards layout |
+| `/content` | Type filter, type column, icons |
+| `/content/[id]` | Type-specific metadata display |
+| `/dashboard` | Stats by content type |
 
 ---
 
 ## Phase 7: Initial Podcast Sources
 
-### 7.1 Seed Data
-Add the 18 podcasts from the PRD as initial sources:
+### 7.1 Seed Script
+**File:** `scripts/seed-podcasts.ts`
 
-1. 20 VC
-2. BG2 Pod
-3. Big Technology Podcast
-4. Dwarkesh Podcast
-5. Google AI Release Notes
-6. Google DeepMind: The Podcast
-7. Hard Fork
-8. Lenny's Podcast
-9. Lex Fridman Podcast
-10. No Priors
-11. The 80,000 Hours Podcast
-12. The a16z Show
-13. The Cognitive Revolution
-14. The Logan Bartlett Show
-15. The MAD Podcast
-16. The OpenAI Podcast
-17. Uncapped
-18. Y Combinator Startup Podcast
+Import the 18 podcasts from PRD with discovered RSS feeds:
 
-### 7.2 RSS Feed Discovery
-Create script to discover RSS feeds for each podcast:
-**File:** `scripts/discover-podcast-feeds.ts`
+```typescript
+const INITIAL_PODCASTS = [
+  { name: "20 VC", url: "https://feeds.megaphone.fm/20vc" },
+  { name: "BG2 Pod", url: "TBD" },
+  { name: "Big Technology Podcast", url: "TBD" },
+  { name: "Dwarkesh Podcast", url: "TBD" },
+  { name: "Google AI Release Notes", url: "TBD" },
+  { name: "Google DeepMind: The Podcast", url: "TBD" },
+  { name: "Hard Fork", url: "TBD" },
+  { name: "Lenny's Podcast", url: "TBD" },
+  { name: "Lex Fridman Podcast", url: "TBD" },
+  { name: "No Priors", url: "TBD" },
+  { name: "The 80,000 Hours Podcast", url: "TBD" },
+  { name: "The a16z Show", url: "TBD" },
+  { name: "The Cognitive Revolution", url: "TBD" },
+  { name: "The Logan Bartlett Show", url: "TBD" },
+  { name: "The MAD Podcast", url: "TBD" },
+  { name: "The OpenAI Podcast", url: "TBD" },
+  { name: "Uncapped", url: "TBD" },
+  { name: "Y Combinator Startup Podcast", url: "TBD" }
+]
+```
 
----
-
-## Implementation Order
-
-### Sprint 1: Database & Core Infrastructure (Foundation)
-1. ✅ Schema migrations (ContentType enum, metadata updates)
-2. ✅ Podcast feed parsing module (`src/lib/ingestion/podcast.ts`)
-3. ✅ Basic RSS transcript fetching strategy
-4. ✅ Unit tests for feed parsing
-
-### Sprint 2: Inngest Integration (Backend Logic)
-1. ✅ Extend `checkSource` for PODCAST type
-2. ✅ Implement transcript fallback system
-3. ✅ Add page scraping strategy
-4. ✅ Integration tests for full pipeline
-
-### Sprint 3: API & UI (User Interface)
-1. ✅ Source discovery endpoint
-2. ✅ Update AddSourceDialog for podcasts
-3. ✅ Content type indicators in UI
-4. ✅ Audio player component
-
-### Sprint 4: ASR Fallback (Complete Coverage)
-1. ✅ OpenAI Whisper API integration
-2. ✅ ASR transcript strategy
-3. ✅ Transcript retry UI
-4. ✅ Handle failed transcripts
-
-### Sprint 5: Polish & Seed (Launch)
-1. ✅ Seed initial 18 podcast sources
-2. ✅ Bulk historical import
-3. ✅ Dashboard analytics for podcasts
-4. ✅ Documentation updates
+### 7.2 Feed Discovery
+Create utility to auto-discover RSS feeds from website URLs.
 
 ---
 
-## Technical Considerations
+## Implementation Sprints
 
-### Rate Limiting
-- RSS feeds: Respect cache headers, poll no more than hourly
-- ASR: OpenAI Whisper has rate limits, implement queuing
+### Sprint 1: Foundation (Database + Podcast Parsing)
+**Estimated Files: 8-10**
 
-### Storage
-- Audio files: Stream from source, don't store locally
-- Transcripts: Store in database (already implemented)
-- Consider S3 for raw audio archival if needed
+1. Prisma schema migration (ContentType enum)
+2. `src/lib/ingestion/podcast.ts` - RSS parsing module
+3. `src/lib/ingestion/transcript-strategies/rss-transcript.ts`
+4. `src/lib/ingestion/transcript-strategies/page-scraper.ts`
+5. Unit tests for podcast parsing
+6. Update types throughout codebase
+
+### Sprint 2: Backend Integration (Inngest + APIs)
+**Estimated Files: 6-8**
+
+1. Modify `check-sources.ts` for PODCAST type
+2. Modify `process-content` for podcast transcripts
+3. `src/app/api/sources/discover/route.ts`
+4. `src/app/api/sources/validate-podcast/route.ts`
+5. Update `src/app/api/sources/route.ts`
+6. Integration tests
+
+### Sprint 3: UI - Sources Page
+**Estimated Files: 8-10**
+
+1. `source-type-selector.tsx` component
+2. Update `add-source-dialog.tsx` for multi-type
+3. `podcast-preview.tsx` component
+4. Update `source-card.tsx` with type support
+5. Update `/sources/page.tsx` with grouped layout
+6. Styling and polish
+
+### Sprint 4: UI - Content Pages
+**Estimated Files: 6-8**
+
+1. `content-type-badge.tsx` component
+2. `transcript-source-badge.tsx` component
+3. Update `content-table.tsx` with type column/filter
+4. Update `/content/[id]/page.tsx` for podcast metadata
+5. Update filters component
+6. Dashboard stats by type
+
+### Sprint 5: Seed & Polish
+**Estimated Files: 4-6**
+
+1. RSS feed discovery script
+2. `scripts/seed-podcasts.ts`
+3. Run initial import of 18 podcasts × 10 episodes
+4. End-to-end testing
+5. Documentation
+6. Bug fixes and polish
+
+---
+
+## Technical Notes
+
+### RSS Feed Parsing Libraries
+- Primary: `rss-parser` - Well-maintained, supports custom fields
+- Fallback: `fast-xml-parser` for edge cases
+
+### Transcript Format Handling
+Podcasting 2.0 supports multiple formats:
+- `text/plain` - Direct text, easiest
+- `text/html` - Need to strip HTML
+- `text/vtt` or `application/x-subrip` - Parse timing, extract text
+- `application/json` - Parse structured segments
+
+### Deduplication Strategy
+When same interview exists on YouTube AND podcast RSS:
+- Check if content with same title + similar date exists
+- If podcast has RSS transcript, prefer it
+- Mark as "duplicate" in metadata but keep both for reference
 
 ### Error Handling
-- Graceful degradation through transcript strategies
-- Mark content as FAILED only after all strategies exhausted
-- Detailed logging for debugging transcript acquisition
-
-### Cost Considerations
-- ASR transcription costs: ~$0.006/minute with OpenAI Whisper
-- A typical 1-hour podcast = ~$0.36 for ASR
-- Prioritize free strategies (RSS, scraping) first
+- RSS parsing errors: Log and mark source as needing attention
+- Transcript not found: Mark content status, show in UI
+- No ASR fallback: Content stays in "PENDING_TRANSCRIPT" state
 
 ---
 
-## Questions for Deven
+## Success Criteria
 
-Before proceeding, I'd like to clarify:
-
-1. **ASR Service Preference:** Should we use:
-   - OpenAI Whisper API (simple, pay-per-use)
-   - AssemblyAI (better speaker diarization)
-   - Self-hosted Whisper (cost-effective at scale, requires setup)
-
-2. **Historical Import Depth:** How many past episodes should we import for each podcast?
-   - Last 10 episodes only?
-   - Last 3 months?
-   - Full archive?
-
-3. **Transcript Quality Priority:** For podcasts with both RSS transcripts and YouTube versions, which should take priority?
-   - Official RSS transcripts (often auto-generated)
-   - YouTube captions (may be better quality)
-
-4. **Audio Storage:** Should we archive podcast audio files, or always stream from source?
-   - Stream only (no storage costs)
-   - Archive to S3 (reproducibility, ASR retries)
-
-5. **Speaker Diarization:** Is identifying "who said what" important for your analysis?
-   - If yes: Need WhisperX or AssemblyAI
-   - If no: Standard Whisper is simpler
-
-6. **UI Priority:** Should we build out the podcast management UI fully, or start with a minimal "add by RSS URL" approach?
+1. **18 podcast sources** added and actively monitored
+2. **180 episodes** imported (18 × 10 episodes each)
+3. **Daily polling** working for new episodes
+4. **Transcript coverage** > 80% via RSS/scraping (no ASR)
+5. **UI clearly shows** content type differentiation
+6. **Zero disruption** to existing YouTube functionality
 
 ---
 
-## Risk Assessment
+## Future Phases (Out of Scope)
 
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| RSS feed structure varies | Medium | Robust parsing with fallbacks |
-| Some podcasts lack transcripts | High | ASR fallback ensures 100% coverage |
-| ASR costs for large archives | Medium | Prioritize free strategies first |
-| Rate limiting from sources | Low | Implement respectful polling |
-| JavaScript-heavy episode pages | Medium | Playwright fallback for scraping |
-
----
-
-## Success Metrics
-
-1. **Coverage:** 100% of episodes have transcripts
-2. **Cost:** < $1 per episode on average (including ASR fallback)
-3. **Latency:** New episodes processed within 24 hours of publication
-4. **Quality:** Transcripts sufficient for meaningful AI analysis
+- **ASR Integration:** Add Whisper API when transcript coverage drops below acceptable
+- **Twitter Integration:** Monitor AI thought leaders
+- **Newsletter Integration:** Stratechery, The AI Letter, etc.
+- **Cross-Content Deduplication:** Smart matching of same interview across platforms
+- **Trend Analysis:** AI-powered trend detection across all sources
