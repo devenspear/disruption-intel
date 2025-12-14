@@ -2,8 +2,9 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/db"
 import { authOptions } from "@/lib/auth"
-import { fetchYouTubeChannelVideos } from "@/lib/ingestion/youtube"
+import { getChannelVideos } from "@/lib/ingestion/youtube"
 import { fetchTranscript } from "@/lib/ingestion/transcript"
+import { Prisma } from "@prisma/client"
 
 export async function POST(
   request: Request,
@@ -30,9 +31,9 @@ export async function POST(
 
     if (source.type === "YOUTUBE_CHANNEL") {
       // Fetch latest videos from YouTube channel
-      const videos = await fetchYouTubeChannelVideos(source.url)
+      const videos = await getChannelVideos(source.url, 5)
 
-      for (const video of videos.slice(0, 5)) { // Process up to 5 videos
+      for (const video of videos) {
         // Check if content already exists
         const existing = await prisma.content.findUnique({
           where: {
@@ -51,9 +52,9 @@ export async function POST(
               externalId: video.id,
               title: video.title,
               description: video.description,
-              publishedAt: new Date(video.publishedAt),
+              publishedAt: video.publishedAt,
               duration: video.duration,
-              thumbnailUrl: video.thumbnail,
+              thumbnailUrl: video.thumbnailUrl,
               originalUrl: `https://www.youtube.com/watch?v=${video.id}`,
               status: "PENDING",
             },
@@ -69,7 +70,7 @@ export async function POST(
                 data: {
                   contentId: content.id,
                   fullText: transcriptData.fullText,
-                  segments: transcriptData.segments,
+                  segments: transcriptData.segments as unknown as Prisma.InputJsonValue,
                   language: transcriptData.language || "en",
                   source: "youtube",
                   wordCount: transcriptData.fullText.split(/\s+/).length,
