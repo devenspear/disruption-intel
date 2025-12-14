@@ -5,13 +5,13 @@
  * 1. RSS transcript URL (from <podcast:transcript> tag)
  * 2. Page scraping (scrape episode page for transcript section)
  * 3. YouTube fallback (if podcast has YouTube mirror)
- *
- * ASR (Whisper) is deferred to a future phase.
+ * 4. Whisper ASR (download audio and transcribe with OpenAI Whisper)
  */
 
 import { fetchRSSTranscript } from './rss-transcript'
 import { scrapeTranscriptFromPage } from './page-scraper'
 import { fetchYouTubeTranscript } from './youtube-fallback'
+import { transcribeWithWhisper, isValidAudioUrl } from './whisper-asr'
 import { logger } from '@/lib/logger'
 
 export type TranscriptSource =
@@ -19,6 +19,7 @@ export type TranscriptSource =
   | 'podcast_scraped'
   | 'youtube_auto'
   | 'youtube_fallback'
+  | 'whisper_asr'
   | 'manual'
   | 'unavailable'
 
@@ -41,6 +42,8 @@ export interface TranscriptAcquisitionOptions {
   transcriptUrl?: string | null // From RSS feed
   episodeUrl?: string | null // For page scraping
   youtubeVideoId?: string | null // For YouTube fallback
+  audioUrl?: string | null // For Whisper ASR transcription
+  audioDuration?: number // Duration in seconds (for cost estimation)
   contentId?: string // For logging
 }
 
@@ -157,6 +160,43 @@ export async function acquireTranscript(
     }
   } else {
     attemptedStrategies.push({ strategy: 'youtube_fallback', success: false, error: 'No YouTube ID' })
+  }
+
+  // Strategy 4: Whisper ASR (download audio and transcribe)
+  if (isValidAudioUrl(options.audioUrl)) {
+    logger.info('transcript', 'strategy.whisper.start', `Attempting Whisper ASR transcription`, {
+      contentId,
+      metadata: { audioUrl: options.audioUrl, duration: options.audioDuration },
+    })
+
+    try {
+      const result = await transcribeWithWhisper({
+        audioUrl: options.audioUrl!,
+        contentId,
+        expectedDuration: options.audioDuration,
+      })
+      if (result) {
+        attemptedStrategies.push({ strategy: 'whisper_asr', success: true })
+        logger.info('transcript', 'strategy.whisper.success', `Whisper transcription acquired`, {
+          contentId,
+          metadata: { wordCount: result.wordCount },
+        })
+        return { success: true, transcript: result, attemptedStrategies }
+      }
+      attemptedStrategies.push({
+        strategy: 'whisper_asr',
+        success: false,
+        error: 'Whisper transcription failed',
+      })
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      attemptedStrategies.push({ strategy: 'whisper_asr', success: false, error: errorMsg })
+      logger.warn('transcript', 'strategy.whisper.failed', `Whisper ASR failed: ${errorMsg}`, {
+        contentId,
+      })
+    }
+  } else {
+    attemptedStrategies.push({ strategy: 'whisper_asr', success: false, error: 'No valid audio URL' })
   }
 
   // All strategies exhausted

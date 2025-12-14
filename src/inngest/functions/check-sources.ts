@@ -221,13 +221,19 @@ export const processContent = inngest.createFunction(
         contentId: content.id,
       })
 
-      const metadata = content.metadata as { audioUrl?: string; transcriptUrl?: string } | null
+      const metadata = content.metadata as {
+        audioUrl?: string
+        transcriptUrl?: string
+        duration?: number
+      } | null
 
       const result = await step.run("acquire-podcast-transcript", async () => {
         return acquireTranscript({
           transcriptUrl: metadata?.transcriptUrl,
           episodeUrl: content.originalUrl,
           youtubeVideoId: null, // Could be enhanced to detect YouTube mirrors
+          audioUrl: metadata?.audioUrl, // For Whisper ASR fallback
+          audioDuration: metadata?.duration, // Duration in seconds
           contentId: content.id,
         })
       })
