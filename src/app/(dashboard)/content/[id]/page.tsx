@@ -22,6 +22,8 @@ import {
   CheckCircle2,
   Loader2,
   ChevronLeft,
+  Video,
+  Mic,
 } from "lucide-react"
 import { formatDistanceToNow, format } from "date-fns"
 import { toast } from "sonner"
@@ -43,6 +45,7 @@ interface ContentDetail {
   originalUrl: string
   externalId: string
   status: string
+  contentType: string | null
   source: {
     id: string
     name: string
@@ -96,6 +99,29 @@ interface AnalysisStep {
   name: string
   status: "pending" | "running" | "complete" | "error"
   message?: string
+}
+
+// Helper functions for transcript source display
+function getTranscriptSourceLabel(source: string): string {
+  const labels: Record<string, string> = {
+    youtube_auto: "YouTube",
+    podcast_rss: "RSS",
+    podcast_scraped: "Scraped",
+    youtube_fallback: "YT Fallback",
+    manual: "Manual",
+  }
+  return labels[source] || source
+}
+
+function getTranscriptSourceColor(source: string): string {
+  const colors: Record<string, string> = {
+    youtube_auto: "bg-red-100 text-red-700",
+    podcast_rss: "bg-green-100 text-green-700",
+    podcast_scraped: "bg-yellow-100 text-yellow-700",
+    youtube_fallback: "bg-orange-100 text-orange-700",
+    manual: "bg-blue-100 text-blue-700",
+  }
+  return colors[source] || "bg-gray-100 text-gray-700"
 }
 
 export default function ContentDetailPage({
@@ -301,16 +327,30 @@ export default function ContentDetailPage({
               <div className="min-w-0 flex-1">
                 <h1 className="text-lg font-semibold truncate leading-tight">{content.title}</h1>
                 <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                  {(content.contentType === "PODCAST_EPISODE" || content.source.type === "PODCAST") ? (
+                    <span title="Podcast Episode" className="flex items-center gap-1">
+                      <Mic className="h-3 w-3 text-purple-500" />
+                    </span>
+                  ) : (
+                    <span title="Video" className="flex items-center gap-1">
+                      <Video className="h-3 w-3 text-red-500" />
+                    </span>
+                  )}
                   <Badge variant="outline" className="text-xs px-1.5 py-0">{content.source.name}</Badge>
                   <Badge className={`${statusColors[content.status]} text-xs px-1.5 py-0`}>{content.status}</Badge>
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {formatDistanceToNow(new Date(content.publishedAt))} ago
+                    {format(new Date(content.publishedAt), "MMM d, yyyy")}
                   </span>
                   {content.transcript && (
                     <span className="flex items-center gap-1">
                       <FileText className="h-3 w-3" />
                       {content.transcript.wordCount.toLocaleString()} words
+                      {content.transcript.source && (
+                        <span className={`ml-1 text-xs px-1.5 py-0.5 rounded ${getTranscriptSourceColor(content.transcript.source)}`}>
+                          {getTranscriptSourceLabel(content.transcript.source)}
+                        </span>
+                      )}
                     </span>
                   )}
                 </div>
