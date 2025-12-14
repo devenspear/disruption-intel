@@ -8,6 +8,7 @@ export default withAuth({
 
 export const config = {
   matcher: [
-    "/((?!api/auth|login|_next/static|_next/image|favicon.ico).*)",
+    // Exclude from middleware: api/auth, api/inngest, login, static assets
+    "/((?!api/auth|api/inngest|login|register|_next/static|_next/image|favicon.ico).*)",
   ],
 }
