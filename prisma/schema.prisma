@@ -1,0 +1,194 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+  binaryTargets   = ["native", "windows", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum SourceType {
+  YOUTUBE_CHANNEL
+  PODCAST
+  RSS
+  MANUAL
+}
+
+enum ContentStatus {
+  PENDING
+  PROCESSING
+  ANALYZED
+  FAILED
+  ARCHIVED
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// Application models
+model Source {
+  id             String     @id @default(cuid())
+  name           String
+  type           SourceType
+  url            String
+  checkFrequency String     @default("daily")
+  isActive       Boolean    @default(true)
+  lastChecked    DateTime?
+  metadata       Json?
+  contents       Content[]
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+}
+
+model Content {
+  id           String        @id @default(cuid())
+  sourceId     String
+  source       Source        @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  externalId   String
+  title        String
+  description  String?       @db.Text
+  publishedAt  DateTime
+  duration     Int?
+  thumbnailUrl String?
+  originalUrl  String
+  transcript   Transcript?
+  analyses     Analysis[]
+  tags         Tag[]
+  collections  Collection[]
+  usageHistory UsageRecord[]
+  status       ContentStatus @default(PENDING)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([sourceId, externalId])
+}
+
+model Transcript {
+  id        String                       @id @default(cuid())
+  contentId String                       @unique
+  content   Content                      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  fullText  String                       @db.Text
+  segments  Json
+  language  String                       @default("en")
+  source    String
+  wordCount Int
+  embedding Unsupported("vector(1536)")?
+  createdAt DateTime                     @default(now())
+}
+
+model Analysis {
+  id             String         @id @default(cuid())
+  contentId      String
+  content        Content        @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  promptId       String
+  prompt         AnalysisPrompt @relation(fields: [promptId], references: [id])
+  model          String
+  result         Json
+  summary        String         @db.Text
+  keyInsights    String[]
+  quotableLines  String[]
+  relevanceScore Float?
+  tokensUsed     Int
+  processingTime Int
+  createdAt      DateTime       @default(now())
+}
+
+model AnalysisPrompt {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  systemPrompt String     @db.Text
+  outputSchema Json?
+  isDefault    Boolean    @default(false)
+  isActive     Boolean    @default(true)
+  analyses     Analysis[]
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  color     String?
+  contents  Content[]
+  createdAt DateTime  @default(now())
+}
+
+model Collection {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  contents    Content[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model UsageRecord {
+  id          String   @id @default(cuid())
+  contentId   String
+  content     Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  destination String
+  notes       String?
+  usedAt      DateTime @default(now())
+}
+
+model Job {
+  id        String   @id @default(cuid())
+  type      String
+  status    String   @default("pending")
+  payload   Json?
+  result    Json?
+  error     String?
+  startedAt DateTime?
+  endedAt   DateTime?
+  createdAt DateTime @default(now())
+}
