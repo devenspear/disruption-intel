@@ -3,15 +3,13 @@
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -23,13 +21,12 @@ export default function LoginPage() {
 
     try {
       const result = await signIn("credentials", {
-        email,
         password,
         redirect: false,
       })
 
       if (result?.error) {
-        setError("Invalid email or password")
+        setError("Invalid password")
       } else {
         router.push("/")
         router.refresh()
@@ -46,7 +43,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Disruption Intelligence Engine</CardTitle>
-          <CardDescription>Enter your credentials to access the platform</CardDescription>
+          <CardDescription>Enter your password to access the platform</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -56,17 +53,6 @@ export default function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -74,6 +60,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoFocus
               />
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
@@ -81,14 +68,6 @@ export default function LoginPage() {
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="flex justify-center">
-          <p className="text-sm text-muted-foreground">
-            Don't have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline">
-              Register
-            </Link>
-          </p>
-        </CardFooter>
       </Card>
     </div>
   )
