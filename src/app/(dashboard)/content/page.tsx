@@ -14,6 +14,7 @@ interface Content {
   title: string
   publishedAt: string
   status: string
+  contentType?: string
   thumbnailUrl: string | null
   originalUrl: string
   source: {
@@ -23,6 +24,7 @@ interface Content {
   }
   transcript: {
     wordCount: number
+    source?: string
   } | null
   analyses: Array<{
     relevanceScore: number | null
@@ -203,7 +205,7 @@ function ContentPageContent() {
         </div>
       ) : (
         <>
-          <div className="rounded-md border">
+          <div className="rounded-md border overflow-x-auto">
             <ContentTable
               contents={contents}
               onAnalyze={handleAnalyze}

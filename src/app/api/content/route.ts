@@ -38,12 +38,19 @@ export async function GET(request: Request) {
   const [contents, total] = await Promise.all([
     prisma.content.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        title: true,
+        publishedAt: true,
+        status: true,
+        contentType: true,
+        thumbnailUrl: true,
+        originalUrl: true,
         source: {
           select: { id: true, name: true, type: true },
         },
         transcript: {
-          select: { wordCount: true },
+          select: { wordCount: true, source: true },
         },
         analyses: {
           select: { relevanceScore: true },
