@@ -14,6 +14,7 @@ enum SourceType {
   YOUTUBE_CHANNEL
   PODCAST
   RSS
+  SUBSTACK
   TWITTER
   MANUAL
 }

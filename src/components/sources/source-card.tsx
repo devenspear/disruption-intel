@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MoreVertical, Play, Pause, Trash2, RefreshCw, ExternalLink } from "lucide-react"
+import { MoreVertical, Play, Pause, Trash2, RefreshCw, ExternalLink, Pencil } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 
 interface Source {
@@ -31,6 +31,7 @@ interface SourceCardProps {
   onDelete: (id: string) => void
   onCheck: (id: string) => void
   onProcess: (id: string) => void
+  onEdit: (source: Source) => void
   isProcessing?: boolean
 }
 
@@ -38,6 +39,8 @@ const sourceTypeLabels: Record<string, string> = {
   YOUTUBE_CHANNEL: "YouTube",
   PODCAST: "Podcast",
   RSS: "RSS",
+  SUBSTACK: "Substack",
+  TWITTER: "Twitter/X",
   MANUAL: "Manual",
 }
 
@@ -45,10 +48,12 @@ const sourceTypeColors: Record<string, string> = {
   YOUTUBE_CHANNEL: "bg-red-500",
   PODCAST: "bg-purple-500",
   RSS: "bg-orange-500",
+  SUBSTACK: "bg-orange-600",
+  TWITTER: "bg-sky-500",
   MANUAL: "bg-blue-500",
 }
 
-export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProcess, isProcessing }: SourceCardProps) {
+export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProcess, onEdit, isProcessing }: SourceCardProps) {
   return (
     <Card className="relative">
       <CardHeader className="pb-2">
@@ -73,6 +78,10 @@ export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProces
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(source)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => onCheck(source.id)}>
                 <RefreshCw className="mr-2 h-4 w-4" />
                 Check Now

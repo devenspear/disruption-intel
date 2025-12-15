@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -8,7 +8,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -20,10 +19,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Plus } from "lucide-react"
 
-interface AddSourceDialogProps {
-  onAdd: (source: {
+interface Source {
+  id: string
+  name: string
+  type: string
+  url: string
+  isActive: boolean
+  checkFrequency: string
+}
+
+interface EditSourceDialogProps {
+  source: Source | null
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSave: (id: string, data: {
     name: string
     type: string
     url: string
@@ -31,59 +41,60 @@ interface AddSourceDialogProps {
   }) => Promise<void>
 }
 
-export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
-  const [open, setOpen] = useState(false)
+export function EditSourceDialog({ source, open, onOpenChange, onSave }: EditSourceDialogProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [name, setName] = useState("")
   const [type, setType] = useState("YOUTUBE_CHANNEL")
   const [url, setUrl] = useState("")
   const [checkFrequency, setCheckFrequency] = useState("daily")
 
+  // Update form when source changes
+  useEffect(() => {
+    if (source) {
+      setName(source.name)
+      setType(source.type)
+      setUrl(source.url)
+      setCheckFrequency(source.checkFrequency)
+    }
+  }, [source])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!source) return
+
     setIsLoading(true)
 
     try {
-      await onAdd({ name, type, url, checkFrequency })
-      setOpen(false)
-      setName("")
-      setUrl("")
-      setType("YOUTUBE_CHANNEL")
-      setCheckFrequency("daily")
+      await onSave(source.id, { name, type, url, checkFrequency })
+      onOpenChange(false)
     } finally {
       setIsLoading(false)
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Source
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add New Source</DialogTitle>
+          <DialogTitle>Edit Source</DialogTitle>
           <DialogDescription>
-            Add a new content source to monitor for disruptive technology insights.
+            Update the source configuration.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
+              <Label htmlFor="edit-name">Name</Label>
               <Input
-                id="name"
-                placeholder="Peter Diamandis"
+                id="edit-name"
+                placeholder="Source name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="type">Source Type</Label>
+              <Label htmlFor="edit-type">Source Type</Label>
               <Select value={type} onValueChange={setType}>
                 <SelectTrigger>
                   <SelectValue />
@@ -99,18 +110,10 @@ export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="url">URL</Label>
+              <Label htmlFor="edit-url">URL</Label>
               <Input
-                id="url"
-                type={type === "TWITTER" ? "text" : "url"}
-                placeholder={
-                  type === "YOUTUBE_CHANNEL" ? "https://youtube.com/@channel" :
-                  type === "PODCAST" ? "https://feeds.example.com/podcast.xml" :
-                  type === "RSS" ? "https://blog.example.com/feed" :
-                  type === "SUBSTACK" ? "https://newsletter.substack.com/feed" :
-                  type === "TWITTER" ? "@username or search:AI startup" :
-                  "https://..."
-                }
+                id="edit-url"
+                placeholder="https://..."
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
                 required
@@ -122,12 +125,12 @@ export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
               )}
               {type === "TWITTER" && (
                 <p className="text-xs text-muted-foreground">
-                  Use @username for user tweets or search:query for search results. Requires TWITTER_API_KEY.
+                  Use @username or search:query format
                 </p>
               )}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="frequency">Check Frequency</Label>
+              <Label htmlFor="edit-frequency">Check Frequency</Label>
               <Select value={checkFrequency} onValueChange={setCheckFrequency}>
                 <SelectTrigger>
                   <SelectValue />
@@ -141,11 +144,11 @@ export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Adding..." : "Add Source"}
+              {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
         </form>

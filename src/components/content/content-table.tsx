@@ -43,6 +43,7 @@ import {
 // Content type icon component with modern styling
 function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: string }) {
   const isPodcast = type === "PODCAST_EPISODE" || sourceType === "PODCAST"
+  const isSubstack = sourceType === "SUBSTACK"
   const isArticle = type === "ARTICLE" || sourceType === "RSS"
   const isTweet = type === "SOCIAL_POST" || sourceType === "TWITTER"
 
@@ -50,6 +51,14 @@ function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: stri
     return (
       <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30">
         <Headphones className="h-4 w-4 text-purple-400" />
+      </div>
+    )
+  }
+
+  if (isSubstack) {
+    return (
+      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-orange-600/20 to-orange-700/20 border border-orange-600/30">
+        <FileText className="h-4 w-4 text-orange-500" />
       </div>
     )
   }

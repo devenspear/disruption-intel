@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { SourceCard } from "@/components/sources/source-card"
 import { AddSourceDialog } from "@/components/sources/add-source-dialog"
+import { EditSourceDialog } from "@/components/sources/edit-source-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 
@@ -23,6 +24,8 @@ export default function SourcesPage() {
   const [sources, setSources] = useState<Source[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [editingSource, setEditingSource] = useState<Source | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
 
   const fetchSources = async () => {
     try {
@@ -128,6 +131,32 @@ export default function SourcesPage() {
     }
   }
 
+  const handleEdit = (source: Source) => {
+    setEditingSource(source)
+    setIsEditDialogOpen(true)
+  }
+
+  const handleSaveEdit = async (id: string, data: {
+    name: string
+    type: string
+    url: string
+    checkFrequency: string
+  }) => {
+    const res = await fetch(`/api/sources/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    })
+
+    if (res.ok) {
+      toast.success("Source updated successfully")
+      fetchSources()
+    } else {
+      const errorData = await res.json()
+      toast.error(errorData.error || "Failed to update source")
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -161,11 +190,19 @@ export default function SourcesPage() {
               onDelete={handleDelete}
               onCheck={handleCheck}
               onProcess={handleProcess}
+              onEdit={handleEdit}
               isProcessing={processingId === source.id}
             />
           ))}
         </div>
       )}
+
+      <EditSourceDialog
+        source={editingSource}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        onSave={handleSaveEdit}
+      />
     </div>
   )
 }

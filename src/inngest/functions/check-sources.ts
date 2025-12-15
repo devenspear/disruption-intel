@@ -185,7 +185,7 @@ export const checkSource = inngest.createFunction(
     }
 
     // For RSS feeds (Substack, blogs, newsletters), fetch recent articles
-    if (source.type === "RSS") {
+    if (source.type === "RSS" || source.type === "SUBSTACK") {
       logger.info("inngest", "check-source.rss.start", `Checking RSS source: ${source.name}`, {
         metadata: { sourceId: source.id, feedUrl: source.url },
       })
@@ -390,7 +390,7 @@ export const processContent = inngest.createFunction(
 
     // Determine content type and fetch transcript accordingly
     const isPodcast = content.contentType === "PODCAST_EPISODE" || content.source.type === "PODCAST"
-    const isArticle = content.contentType === "ARTICLE" || content.source.type === "RSS"
+    const isArticle = content.contentType === "ARTICLE" || content.source.type === "RSS" || content.source.type === "SUBSTACK"
     const isTweet = content.contentType === "SOCIAL_POST" || content.source.type === "TWITTER"
 
     // For tweets, the tweet text serves as the "transcript"
