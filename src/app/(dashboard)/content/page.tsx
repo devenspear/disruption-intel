@@ -371,24 +371,29 @@ function ContentPageContent() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Content Library</h1>
-          <p className="text-muted-foreground">
-            {total > 0 ? `${total.toLocaleString()} items` : "Browse and manage all ingested content"}
-          </p>
+    <div className="flex flex-col h-full">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 pt-0 border-b">
+        <div className="flex items-center justify-between py-4">
+          <div>
+            <h1 className="text-3xl font-bold">Content Library</h1>
+            <p className="text-muted-foreground">
+              {total > 0 ? `${total.toLocaleString()} items` : "Browse and manage all ingested content"}
+            </p>
+          </div>
         </div>
+
+          <ContentFilters
+          sources={sources}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onReset={handleReset}
+        />
       </div>
 
-      <ContentFilters
-        sources={sources}
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        onReset={handleReset}
-      />
-
-      {/* Batch Action Bar */}
+      {/* Scrollable Content Area */}
+      <div className="flex-1 space-y-6 pt-4">
+        {/* Batch Action Bar */}
       {selectedIds.size > 0 && (
         <div className="sticky top-0 z-10 flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
           <span className="text-sm font-medium">
@@ -496,6 +501,7 @@ function ContentPageContent() {
           </div>
         </>
       )}
+      </div>
     </div>
   )
 }

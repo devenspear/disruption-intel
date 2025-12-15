@@ -174,28 +174,33 @@ export default function SourcesPage() {
     : sources
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Sources</h1>
-          <p className="text-muted-foreground">
-            Manage your content sources for monitoring
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant={sortByType ? "secondary" : "outline"}
-            size="sm"
-            onClick={() => setSortByType(!sortByType)}
-          >
-            <ArrowUpDown className="mr-2 h-4 w-4" />
-            {sortByType ? "Sorted by Type" : "Sort by Type"}
-          </Button>
-          <AddSourceDialog onAdd={handleAddSource} />
+    <div className="flex flex-col h-full">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 border-b">
+        <div className="flex items-center justify-between py-4">
+          <div>
+            <h1 className="text-3xl font-bold">Sources</h1>
+            <p className="text-muted-foreground">
+              Manage your content sources for monitoring
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant={sortByType ? "secondary" : "outline"}
+              size="sm"
+              onClick={() => setSortByType(!sortByType)}
+            >
+              <ArrowUpDown className="mr-2 h-4 w-4" />
+              {sortByType ? "Sorted by Type" : "Sort by Type"}
+            </Button>
+            <AddSourceDialog onAdd={handleAddSource} />
+          </div>
         </div>
       </div>
 
-      {isLoading ? (
+      {/* Scrollable Content */}
+      <div className="flex-1 space-y-6 pt-4">
+        {isLoading ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-32" />
@@ -223,12 +228,13 @@ export default function SourcesPage() {
         </div>
       )}
 
-      <EditSourceDialog
-        source={editingSource}
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-        onSave={handleSaveEdit}
-      />
+        <EditSourceDialog
+          source={editingSource}
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          onSave={handleSaveEdit}
+        />
+      </div>
     </div>
   )
 }

@@ -101,16 +101,20 @@ export default function DashboardPage() {
     : 0
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-muted-foreground text-sm">
-          Disruption Intelligence Engine Overview
-        </p>
+    <div className="flex flex-col h-full">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 border-b">
+        <div className="py-4">
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-muted-foreground text-sm">
+            Disruption Intelligence Engine Overview
+          </p>
+        </div>
       </div>
 
-      {/* Primary Stats Row */}
+      {/* Scrollable Content */}
+      <div className="flex-1 space-y-6 pt-4">
+        {/* Primary Stats Row */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -398,6 +402,7 @@ export default function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }
