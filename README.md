@@ -22,6 +22,16 @@ Multi-strategy approach for maximum transcript coverage:
 2. **RSS Transcript** - Podcasting 2.0 `<podcast:transcript>` tags
 3. **Page Scraping** - Extract transcripts from episode show notes
 4. **YouTube Fallback** - For podcasts with YouTube mirrors
+5. **OpenAI Whisper ASR** - Audio-to-text transcription for podcasts without transcripts
+
+#### Whisper ASR Notes
+- Uses OpenAI's Whisper API (`whisper-1` model)
+- Cost: ~$0.006 per minute of audio
+- **Limitation**: 25MB file size limit
+- Works well for podcasts under ~20 minutes
+- Longer episodes (30-60+ min) typically exceed 25MB and will fail
+
+See [Future Roadmap](#future-roadmap) for plans to handle large audio files.
 
 ### AI Analysis
 Dual-provider AI analysis with automatic fallback:
@@ -341,6 +351,65 @@ The YouTube transcript service is deployed on Railway:
 ## Version
 
 See `package.json` for current version. Version is displayed in the app footer with a link to the GitHub repository.
+
+## Future Roadmap
+
+### Large Audio File Transcription (Planned)
+
+**Problem**: OpenAI Whisper API has a 25MB file size limit. Most podcast episodes are 35-75MB (30-60 minutes at 128kbps), causing transcription failures for longer content.
+
+**Current Behavior**:
+- Whisper succeeds for episodes under ~20MB
+- Larger files fail with "Audio file too large: XXmb > 25MB limit"
+- Failed episodes are marked with status "FAILED"
+
+**Planned Solutions** (in order of preference):
+
+#### Option 1: AssemblyAI (Recommended)
+- **Accepts**: URLs directly (no download required)
+- **File Size**: No practical limit
+- **Cost**: $0.01/minute
+- **Free Tier**: 100 hours
+- **Implementation**: Add as fallback when Whisper fails due to file size
+- **Complexity**: LOW - just API integration
+
+```typescript
+// Future implementation pattern
+if (whisperFailed && reason === 'file_too_large') {
+  return await transcribeWithAssemblyAI(audioUrl)
+}
+```
+
+#### Option 2: Deepgram
+- **Accepts**: URLs or file upload
+- **File Size**: No practical limit
+- **Cost**: $0.0043/minute (cheapest option)
+- **Accuracy**: Very high, very fast
+- **Implementation**: Similar to AssemblyAI
+- **Complexity**: LOW
+
+#### Option 3: Audio Chunking (Not Recommended for Vercel)
+- Split audio into 25MB chunks using ffmpeg
+- Transcribe each chunk with Whisper
+- Combine transcripts
+- **Problem**: Requires ffmpeg binary (not available on Vercel serverless)
+- **Complexity**: HIGH
+
+**Decision Log**:
+- 2025-12-15: Identified large file issue affecting most podcast episodes
+- Current Whisper implementation works for ~20% of episodes (shorter ones)
+- Will implement AssemblyAI or Deepgram as fallback in future phase
+
+**Environment Variables Needed** (when implemented):
+```env
+# AssemblyAI
+ASSEMBLYAI_API_KEY="your-key"
+
+# OR Deepgram
+DEEPGRAM_API_KEY="your-key"
+```
+
+---
 
 ## License
 
