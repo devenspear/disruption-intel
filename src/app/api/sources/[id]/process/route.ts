@@ -108,47 +108,60 @@ export async function POST(
         })
 
         if (!existing) {
-          // Create content record for tweet
+          // Build full tweet text including quoted tweets
+          let fullTweetText = tweet.text
+          if (tweet.quotedTweet?.text) {
+            fullTweetText += `\n\n[Quoted @${tweet.quotedTweet.author}]: ${tweet.quotedTweet.text}`
+          }
+
+          // Create content record for tweet with correct contentType
           const content = await prisma.content.create({
             data: {
               sourceId: source.id,
               externalId: tweet.id,
-              title: `Tweet by @${tweet.author.userName}`,
-              description: tweet.text.slice(0, 500),
+              title: `@${tweet.author.userName}: ${tweet.text.slice(0, 100)}${tweet.text.length > 100 ? '...' : ''}`,
+              description: tweet.text,
               publishedAt: tweet.createdAt,
+              thumbnailUrl: tweet.author.profileImageUrl,
               originalUrl: tweet.url,
+              contentType: "SOCIAL_POST",
               status: "PENDING",
               metadata: {
-                author: tweet.author,
+                author: tweet.author.userName,
+                authorName: tweet.author.name,
+                authorId: tweet.author.id,
                 metrics: tweet.metrics,
                 isRetweet: tweet.isRetweet,
                 isReply: tweet.isReply,
+                quotedTweet: tweet.quotedTweet,
+                media: tweet.media,
+                tweetText: fullTweetText,
+                wordCount: fullTweetText.split(/\s+/).length,
               } as unknown as Prisma.InputJsonValue,
             },
           })
 
           itemsProcessed++
 
-          // For tweets, the text itself is the transcript
-          if (tweet.text.length > 50) {
-            await prisma.transcript.create({
-              data: {
-                contentId: content.id,
-                fullText: tweet.text,
-                segments: [] as unknown as Prisma.InputJsonValue,
-                language: "en",
-                source: "twitter",
-                wordCount: tweet.text.split(/\s+/).length,
-              },
-            })
+          // Create transcript from tweet text (tweets are always the "transcript")
+          const wordCount = fullTweetText.split(/\s+/).length
+          await prisma.transcript.create({
+            data: {
+              contentId: content.id,
+              fullText: fullTweetText,
+              segments: [] as unknown as Prisma.InputJsonValue,
+              language: "en",
+              source: "tweet_content",
+              wordCount,
+            },
+          })
 
-            await prisma.content.update({
-              where: { id: content.id },
-              data: { status: "PROCESSING" },
-            })
+          await prisma.content.update({
+            where: { id: content.id },
+            data: { status: "PROCESSING" },
+          })
 
-            contentCreated++
-          }
+          contentCreated++
         }
       }
     } else if (source.type === "PODCAST") {
