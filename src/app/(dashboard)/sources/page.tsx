@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { SourceCard } from "@/components/sources/source-card"
-import { AddSourceDialog } from "@/components/sources/add-source-dialog"
+import { AddSourceInline } from "@/components/sources/add-source-inline"
 import { EditSourceDialog } from "@/components/sources/edit-source-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Button } from "@/components/ui/button"
@@ -178,23 +178,27 @@ export default function SourcesPage() {
       {/* Sticky Header */}
       <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 border-b">
         <div className="flex items-center justify-between py-4">
-          <div>
-            <h1 className="text-3xl font-bold">Sources</h1>
-            <p className="text-muted-foreground">
-              Manage your content sources for monitoring
-            </p>
+          <div className="flex items-center gap-6">
+            <div>
+              <h1 className="text-3xl font-bold">Sources</h1>
+              <p className="text-muted-foreground">
+                Manage your content sources for monitoring
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={sortByType ? "secondary" : "outline"}
-              size="sm"
-              onClick={() => setSortByType(!sortByType)}
-            >
-              <ArrowUpDown className="mr-2 h-4 w-4" />
-              {sortByType ? "Sorted by Type" : "Sort by Type"}
-            </Button>
-            <AddSourceDialog onAdd={handleAddSource} />
-          </div>
+          <Button
+            variant={sortByType ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setSortByType(!sortByType)}
+          >
+            <ArrowUpDown className="mr-2 h-4 w-4" />
+            {sortByType ? "Sorted by Type" : "Sort by Type"}
+          </Button>
+        </div>
+
+        {/* Inline Add Source - Below Header */}
+        <div className="pt-2">
+          <AddSourceInline onAdd={handleAddSource} />
         </div>
       </div>
 
@@ -209,7 +213,7 @@ export default function SourcesPage() {
       ) : sources.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <p className="text-muted-foreground mb-4">No sources added yet</p>
-          <AddSourceDialog onAdd={handleAddSource} />
+          <p className="text-sm text-muted-foreground">Click &quot;Add Source&quot; above to get started</p>
         </div>
       ) : (
         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,280px))]">
