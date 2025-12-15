@@ -13,7 +13,7 @@ A content intelligence platform for monitoring, transcribing, and analyzing vide
 ### Content Sources
 - **YouTube Channels** - Monitor channels for new videos, auto-fetch transcripts
 - **Podcasts** - RSS feed monitoring with multi-tier transcript acquisition
-- **Twitter/X Accounts** - Monitor influential accounts for tweets and threads
+- **Twitter/X Accounts** - Monitor influential accounts for tweets, threads, and Twitter Articles (long-form posts)
 - **Substack** - Newsletter monitoring and content extraction
 
 ### Transcript Acquisition
@@ -216,6 +216,7 @@ src/
 │   ├── ingestion/        # Content ingestion modules
 │   │   ├── podcast.ts    # RSS feed parsing
 │   │   ├── youtube.ts    # YouTube API integration
+│   │   ├── twitter.ts    # Twitter/X API + Article parsing
 │   │   └── transcript-strategies/  # Multi-tier transcript acquisition
 │   ├── logger.ts         # Structured logging system
 │   └── db.ts             # Prisma client
@@ -232,8 +233,21 @@ src/
 |------|--------|---------------------|
 | `VIDEO` | YouTube Channel | YouTube Auto Captions |
 | `PODCAST_EPISODE` | RSS Feed | RSS → Page Scrape → YouTube Fallback |
-| `SOCIAL_POST` | Twitter/X | Direct text content |
+| `SOCIAL_POST` | Twitter/X | Tweet text + Twitter Article content |
 | `ARTICLE` | Substack/RSS | Article body extraction |
+
+### Twitter/X Content Handling
+
+Twitter/X sources support multiple content types:
+- **Regular Tweets** - Direct text content with quoted tweets included
+- **Twitter Articles** - Long-form posts (daily newsletters, etc.) with:
+  - Article title extraction
+  - Preview text (~200 chars from API)
+  - Cover image as thumbnail
+  - Article URL for reference
+- **Threads** - Multi-tweet threads as single content items
+
+Content with less than 10 words (link-only tweets) is automatically skipped for AI analysis.
 
 ## AI Analysis Flow
 
