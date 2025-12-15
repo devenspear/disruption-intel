@@ -51,7 +51,7 @@ const DEFAULT_COLUMN_WIDTHS = {
   status: 110,
   words: 80,
   score: 70,
-  published: 100,
+  published: 115,
   actions: 50,
 }
 
@@ -490,7 +490,7 @@ export function ContentTable({
                   )}
                 </TableCell>
                 <TableCell style={{ width: columnWidths.published }} className="text-sm text-muted-foreground">
-                  {format(new Date(content.publishedAt), "MMM d, yy")}
+                  {format(new Date(content.publishedAt), "MMM d, yyyy")}
                 </TableCell>
                 <TableCell style={{ width: columnWidths.actions }}>
                   <DropdownMenu>
