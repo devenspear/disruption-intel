@@ -54,17 +54,20 @@ export interface TwitterUser {
 interface RawTweet {
   id: string
   text: string
-  created_at: string
+  created_at?: string
+  createdAt?: string  // API uses createdAt not created_at
   author?: {
     id: string
     userName: string
     name: string
     profilePicUrl?: string
+    profilePicture?: string  // API uses profilePicture not profilePicUrl
   }
   likeCount?: number
   retweetCount?: number
   replyCount?: number
   quoteCount?: number
+  viewCount?: number
   isRetweet?: boolean
   isReply?: boolean
   quoted_tweet?: {
@@ -72,16 +75,28 @@ interface RawTweet {
     text: string
     author?: { userName: string }
   }
+  retweeted_tweet?: RawTweet | null
   media?: Array<{
     type: string
     url: string
   }>
+  article?: {
+    title: string
+    preview_text: string
+    cover_media_img_url?: string
+  }
 }
 
 interface TwitterAPIResponse {
-  tweets?: RawTweet[]
   status?: string
+  code?: number
   msg?: string
+  data?: {
+    pin_tweet?: RawTweet | null
+    tweets?: RawTweet[]
+  }
+  // Some endpoints return tweets directly
+  tweets?: RawTweet[]
   has_next_page?: boolean
   next_cursor?: string
 }
@@ -128,15 +143,22 @@ async function makeRequest<T>(endpoint: string, params: Record<string, string>):
  * Parse TwitterAPI response into our Tweet format
  */
 function parseTweet(rawTweet: RawTweet): Tweet {
+  // Handle both createdAt (new API) and created_at (old API) formats
+  const createdAtStr = rawTweet.createdAt || rawTweet.created_at || new Date().toISOString()
+  const profileImageUrl = rawTweet.author?.profilePicture || rawTweet.author?.profilePicUrl
+
+  // Check if this is a retweet by looking at retweeted_tweet field
+  const isRetweet = rawTweet.isRetweet || !!rawTweet.retweeted_tweet
+
   return {
     id: rawTweet.id,
     text: rawTweet.text,
-    createdAt: new Date(rawTweet.created_at),
+    createdAt: new Date(createdAtStr),
     author: {
       id: rawTweet.author?.id || '',
       userName: rawTweet.author?.userName || '',
       name: rawTweet.author?.name || '',
-      profileImageUrl: rawTweet.author?.profilePicUrl,
+      profileImageUrl,
     },
     metrics: {
       likes: rawTweet.likeCount || 0,
@@ -145,7 +167,7 @@ function parseTweet(rawTweet: RawTweet): Tweet {
       quotes: rawTweet.quoteCount || 0,
     },
     url: `https://x.com/${rawTweet.author?.userName}/status/${rawTweet.id}`,
-    isRetweet: rawTweet.isRetweet || false,
+    isRetweet,
     isReply: rawTweet.isReply || false,
     quotedTweet: rawTweet.quoted_tweet ? {
       id: rawTweet.quoted_tweet.id,
@@ -173,12 +195,15 @@ export async function getUserTweets(
       // Note: limit may not be directly supported - API returns recent tweets
     })
 
-    if (!response.tweets || response.tweets.length === 0) {
+    // Handle both response structures: data.tweets (new) and tweets (old)
+    const rawTweets = response.data?.tweets || response.tweets
+
+    if (!rawTweets || rawTweets.length === 0) {
       logger.warn('twitter', 'getUserTweets', `No tweets found for @${userName}`)
       return []
     }
 
-    const tweets = response.tweets
+    const tweets = rawTweets
       .slice(0, limit)
       .map(parseTweet)
       .filter(tweet => !tweet.isRetweet) // Filter out retweets by default
@@ -211,12 +236,15 @@ export async function searchTweets(
       queryType,
     })
 
-    if (!response.tweets || response.tweets.length === 0) {
+    // Handle both response structures: data.tweets (new) and tweets (old)
+    const rawTweets = response.data?.tweets || response.tweets
+
+    if (!rawTweets || rawTweets.length === 0) {
       logger.warn('twitter', 'searchTweets', `No tweets found for query: ${query}`)
       return []
     }
 
-    const tweets = response.tweets
+    const tweets = rawTweets
       .slice(0, limit)
       .map(parseTweet)
 

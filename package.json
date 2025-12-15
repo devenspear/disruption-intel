@@ -1,13 +1,22 @@
 {
   "name": "disruption-intel",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/devenspear/disruption-intel"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "eslint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "version:patch": "node scripts/bump-version.js patch",
+    "version:minor": "node scripts/bump-version.js minor",
+    "version:major": "node scripts/bump-version.js major",
+    "predeploy": "npm run version:patch",
+    "deploy": "vercel --prod --yes"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.2",

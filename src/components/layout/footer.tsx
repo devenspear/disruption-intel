@@ -3,13 +3,13 @@
 import Link from "next/link"
 import { Github } from "lucide-react"
 
-// Import version from package.json
-const APP_VERSION = "0.1.0"
+// Version is managed via package.json and bump-version script
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || "0.1.0"
 const GITHUB_URL = "https://github.com/devenspear/disruption-intel"
 
 export function Footer() {
   return (
-    <footer className="py-3 px-6 bg-background/80 backdrop-blur-sm">
+    <footer className="w-full border-t bg-card/50 py-3 px-6">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>&copy; {new Date().getFullYear()} Deven Spear &middot; Disruption Intel</span>
         <Link

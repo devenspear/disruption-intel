@@ -15,7 +15,6 @@ import {
   Zap,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
-import { Button } from "@/components/ui/button"
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -25,7 +24,8 @@ const navigation = [
   { name: "Search", href: "/search", icon: Search },
   { name: "Prompts", href: "/settings/prompts", icon: MessageSquare },
   { name: "Settings", href: "/settings", icon: Settings },
-]
+  { name: "Sign Out", href: "#signout", icon: LogOut, isSignOut: true },
+] as const
 
 // Logo component with custom design
 function Logo() {
@@ -59,7 +59,25 @@ export function Sidebar() {
       <nav className="flex-1 space-y-1.5 p-4">
         {navigation.map((item) => {
           const isActive = pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href))
+            (item.href !== "/" && item.href !== "#signout" && pathname.startsWith(item.href))
+
+          // Handle Sign Out specially
+          if ('isSignOut' in item && item.isSignOut) {
+            return (
+              <button
+                key={item.name}
+                onClick={() => signOut()}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-all w-full text-left",
+                  "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                )}
+              >
+                <item.icon className="h-5 w-5" />
+                {item.name}
+              </button>
+            )
+          }
+
           return (
             <Link
               key={item.name}
@@ -77,16 +95,6 @@ export function Sidebar() {
           )
         })}
       </nav>
-      <div className="border-t p-4">
-        <Button
-          variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
-          onClick={() => signOut()}
-        >
-          <LogOut className="h-5 w-5" />
-          Sign Out
-        </Button>
-      </div>
     </div>
   )
 }
