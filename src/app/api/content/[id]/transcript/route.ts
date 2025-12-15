@@ -21,7 +21,7 @@ export async function POST(
 
   const content = await prisma.content.findUnique({
     where: { id },
-    include: { transcript: true },
+    include: { transcript: true, source: true },
   })
 
   if (!content) {
@@ -44,6 +44,127 @@ export async function POST(
     })
   }
 
+  // Determine content type
+  const isTweet = content.contentType === "SOCIAL_POST" || content.source.type === "TWITTER"
+  const isArticle = content.contentType === "ARTICLE" || content.source.type === "RSS" || content.source.type === "SUBSTACK"
+
+  // Handle tweets - use tweet text as transcript
+  if (isTweet) {
+    console.log(`[API] Creating transcript from tweet content: ${id}`)
+
+    const metadata = content.metadata as {
+      tweetText?: string
+      wordCount?: number
+      quotedTweet?: { text?: string }
+    } | null
+
+    // Get tweet text from metadata or description
+    let fullText = metadata?.tweetText || content.description || ""
+
+    if (metadata?.quotedTweet?.text) {
+      fullText += `\n\n[Quoted tweet]: ${metadata.quotedTweet.text}`
+    }
+
+    if (!fullText.trim()) {
+      return NextResponse.json({
+        success: false,
+        error: "No tweet text available",
+        debug: { contentType: content.contentType, sourceType: content.source.type },
+      }, { status: 400 })
+    }
+
+    const wordCount = fullText.split(/\s+/).length
+
+    try {
+      await prisma.transcript.create({
+        data: {
+          contentId: content.id,
+          fullText,
+          segments: [],
+          language: "en",
+          source: "tweet_content",
+          wordCount,
+        },
+      })
+
+      // Trigger AI analysis
+      await inngest.send({
+        name: "content/analyze",
+        data: { contentId: id },
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: "Tweet transcript created - analysis started",
+        transcript: { wordCount, segmentCount: 0 },
+        analysisTriggered: true,
+      })
+    } catch (dbError) {
+      console.error(`[API] Database error saving tweet transcript:`, dbError)
+      return NextResponse.json({
+        success: false,
+        error: "Failed to save transcript",
+        debug: { dbError: String(dbError) },
+      }, { status: 500 })
+    }
+  }
+
+  // Handle articles - use article content as transcript
+  if (isArticle) {
+    console.log(`[API] Creating transcript from article content: ${id}`)
+
+    const metadata = content.metadata as {
+      articleContent?: string
+      wordCount?: number
+    } | null
+
+    const fullText = metadata?.articleContent || content.description || ""
+
+    if (!fullText.trim()) {
+      return NextResponse.json({
+        success: false,
+        error: "No article content available",
+        debug: { contentType: content.contentType, sourceType: content.source.type },
+      }, { status: 400 })
+    }
+
+    const wordCount = metadata?.wordCount || fullText.split(/\s+/).length
+
+    try {
+      await prisma.transcript.create({
+        data: {
+          contentId: content.id,
+          fullText,
+          segments: [],
+          language: "en",
+          source: "article_content",
+          wordCount,
+        },
+      })
+
+      // Trigger AI analysis
+      await inngest.send({
+        name: "content/analyze",
+        data: { contentId: id },
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: "Article transcript created - analysis started",
+        transcript: { wordCount, segmentCount: 0 },
+        analysisTriggered: true,
+      })
+    } catch (dbError) {
+      console.error(`[API] Database error saving article transcript:`, dbError)
+      return NextResponse.json({
+        success: false,
+        error: "Failed to save transcript",
+        debug: { dbError: String(dbError) },
+      }, { status: 500 })
+    }
+  }
+
+  // For videos/podcasts - use transcript service
   console.log(`[API] Fetching transcript for video: ${content.externalId}`)
 
   // Update status to processing

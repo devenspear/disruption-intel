@@ -25,6 +25,9 @@ import {
   Trash2,
   AlertTriangle,
   Loader2,
+  ExternalLink,
+  Info,
+  CheckCircle2,
 } from "lucide-react"
 import {
   Select,
@@ -398,9 +401,49 @@ export default function SettingsPage() {
                 </div>
               )}
 
-              <p className="text-xs text-muted-foreground">
-                * Costs are estimated based on published API pricing. Actual costs may vary.
-              </p>
+              {/* Data Source & Verification */}
+              <div className="p-4 rounded-lg border bg-blue-500/5 border-blue-500/20">
+                <div className="flex items-start gap-3">
+                  <Info className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <p className="font-medium text-blue-400">Data Source & Accuracy</p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Token counts are <span className="text-foreground font-medium">actual values</span> returned
+                        by the AI APIs and stored in your database. Costs are <span className="text-amber-400 font-medium">estimates</span> based
+                        on published pricing ($3/1M tokens for Claude, $2.50/1M for GPT-4o).
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium mb-2">Verify actual billing:</p>
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href="https://console.anthropic.com/settings/usage"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-background border text-sm hover:bg-accent transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          Anthropic Console
+                        </a>
+                        <a
+                          href="https://platform.openai.com/usage"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-background border text-sm hover:bg-accent transition-colors"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          OpenAI Dashboard
+                        </a>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Token counts from API responses (real data)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-muted-foreground">Unable to load usage data</p>
