@@ -6,7 +6,13 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { Copy, Check, ChevronDown, ChevronUp, Sparkles, Lightbulb, Quote, Zap, Brain } from "lucide-react"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { Copy, Check, ChevronDown, ChevronUp, Sparkles, Lightbulb, Quote, Zap, Brain, ShieldCheck, AlertTriangle, Info } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 
@@ -36,6 +42,49 @@ interface ExpandedSections {
   insights: boolean
   quotes: boolean
   signals: boolean
+}
+
+// Types for verified analysis format
+interface VerifiedInsight {
+  insight: string
+  sourceText?: string
+  confidence?: number
+}
+
+interface VerifiedQuote {
+  quote: string
+  sourcePosition?: number
+  context?: string
+  speaker?: string
+  confidence?: number
+}
+
+interface VerifiedSignal {
+  signal: string
+  sector: string
+  timeframe: string
+  sourceText?: string
+  confidence?: number | string
+}
+
+interface VerificationSummary {
+  totalClaims: number
+  verifiedClaims: number
+  averageConfidence: number
+}
+
+// Helper to get confidence color
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 95) return "text-emerald-500"
+  if (confidence >= 85) return "text-green-500"
+  if (confidence >= 80) return "text-yellow-500"
+  return "text-orange-500"
+}
+
+function getConfidenceBadgeVariant(confidence: number): "default" | "secondary" | "outline" {
+  if (confidence >= 95) return "default"
+  if (confidence >= 85) return "secondary"
+  return "outline"
 }
 
 export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps) {
@@ -69,22 +118,49 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
 
   // Extract typed values from result for safe JSX rendering
   const disruptionSignals = Array.isArray(result.disruptionSignals)
-    ? (result.disruptionSignals as Array<{
-        signal: string
-        sector: string
-        timeframe: string
-        confidence: string
-      }>)
+    ? (result.disruptionSignals as VerifiedSignal[])
     : null
 
   const categories = Array.isArray(result.categories)
     ? (result.categories as string[])
     : null
 
+  // Extract verification summary if present
+  const verificationSummary = result.verificationSummary as VerificationSummary | undefined
+
+  // Check if this is a verified analysis (has confidence scores)
+  const isVerifiedAnalysis = verificationSummary ||
+    (Array.isArray(result.keyInsights) && result.keyInsights.length > 0 &&
+      typeof result.keyInsights[0] === 'object' && 'confidence' in (result.keyInsights[0] as object))
+
+  // Parse key insights - handle both old (string[]) and new (VerifiedInsight[]) formats
+  const keyInsights: VerifiedInsight[] = Array.isArray(result.keyInsights)
+    ? result.keyInsights.map((item: unknown) => {
+        if (typeof item === 'string') {
+          return { insight: item }
+        }
+        return item as VerifiedInsight
+      })
+    : latestAnalysis.keyInsights.map(insight => ({ insight }))
+
+  // Parse quotable lines - handle both old (string[]) and new (VerifiedQuote[]) formats
+  const quotableLines: VerifiedQuote[] = Array.isArray(result.quotableLines)
+    ? result.quotableLines.map((item: unknown) => {
+        if (typeof item === 'string') {
+          return { quote: item }
+        }
+        if (typeof item === 'object' && item !== null && 'quote' in item) {
+          return item as VerifiedQuote
+        }
+        return { quote: String(item) }
+      })
+    : latestAnalysis.quotableLines.map(quote => ({ quote }))
+
   const modelDisplay = latestAnalysis.model.includes("gpt") ? "GPT-4o" :
     latestAnalysis.model.includes("claude") ? "Claude Sonnet" : latestAnalysis.model
 
   return (
+    <TooltipProvider>
     <Card className="h-full flex flex-col">
       <CardHeader className="py-3 px-4 border-b shrink-0">
         <div className="flex items-center justify-between">
@@ -97,6 +173,25 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
               >
                 {(latestAnalysis.relevanceScore * 100).toFixed(0)}% Relevance
               </Badge>
+            )}
+            {isVerifiedAnalysis && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Badge variant="outline" className="text-xs gap-1 text-emerald-500 border-emerald-500/50">
+                    <ShieldCheck className="h-3 w-3" />
+                    Verified
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">Citation-based analysis with confidence scores</p>
+                  {verificationSummary && (
+                    <p className="text-xs text-muted-foreground">
+                      {verificationSummary.verifiedClaims}/{verificationSummary.totalClaims} claims verified
+                      ({verificationSummary.averageConfidence}% avg confidence)
+                    </p>
+                  )}
+                </TooltipContent>
+              </Tooltip>
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -135,7 +230,7 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
             </section>
 
             {/* Key Insights Section */}
-            {latestAnalysis.keyInsights.length > 0 && (
+            {keyInsights.length > 0 && (
               <section>
                 <button
                   className="flex items-center justify-between w-full text-left mb-2"
@@ -143,7 +238,7 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
                 >
                   <div className="flex items-center gap-2">
                     <Lightbulb className="h-4 w-4 text-yellow-500" />
-                    <h3 className="font-semibold text-sm">Key Insights ({latestAnalysis.keyInsights.length})</h3>
+                    <h3 className="font-semibold text-sm">Key Insights ({keyInsights.length})</h3>
                   </div>
                   {expandedSections.insights ? (
                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -152,11 +247,30 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
                   )}
                 </button>
                 {expandedSections.insights && (
-                  <div className="pl-6 space-y-2">
-                    {latestAnalysis.keyInsights.map((insight, index) => (
-                      <div key={index} className="flex gap-3 text-sm">
-                        <span className="text-primary font-semibold shrink-0">{index + 1}.</span>
-                        <span className="text-foreground/90 leading-relaxed">{insight}</span>
+                  <div className="pl-6 space-y-3">
+                    {keyInsights.map((item, index) => (
+                      <div key={index} className="text-sm">
+                        <div className="flex gap-3 items-start">
+                          <span className="text-primary font-semibold shrink-0">{index + 1}.</span>
+                          <div className="flex-1">
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-foreground/90 leading-relaxed">{item.insight}</span>
+                              {item.confidence && (
+                                <Badge
+                                  variant={getConfidenceBadgeVariant(item.confidence)}
+                                  className={`text-xs shrink-0 ${getConfidenceColor(item.confidence)}`}
+                                >
+                                  {item.confidence}%
+                                </Badge>
+                              )}
+                            </div>
+                            {item.sourceText && (
+                              <div className="mt-1.5 p-2 rounded bg-accent/30 border-l-2 border-primary/30">
+                                <p className="text-xs text-muted-foreground italic">"{item.sourceText}"</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -197,20 +311,34 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
                           </div>
                           <div className="flex gap-1.5 shrink-0">
                             <Badge variant="outline" className="text-xs px-1.5 py-0">{signal.timeframe}</Badge>
-                            <Badge
-                              className="text-xs px-1.5 py-0"
-                              variant={
-                                signal.confidence === "High"
-                                  ? "default"
-                                  : signal.confidence === "Medium"
-                                  ? "secondary"
-                                  : "outline"
-                              }
-                            >
-                              {signal.confidence}
-                            </Badge>
+                            {typeof signal.confidence === 'number' ? (
+                              <Badge
+                                className={`text-xs px-1.5 py-0 ${getConfidenceColor(signal.confidence)}`}
+                                variant={getConfidenceBadgeVariant(signal.confidence)}
+                              >
+                                {signal.confidence}%
+                              </Badge>
+                            ) : (
+                              <Badge
+                                className="text-xs px-1.5 py-0"
+                                variant={
+                                  signal.confidence === "High"
+                                    ? "default"
+                                    : signal.confidence === "Medium"
+                                    ? "secondary"
+                                    : "outline"
+                                }
+                              >
+                                {signal.confidence}
+                              </Badge>
+                            )}
                           </div>
                         </div>
+                        {signal.sourceText && (
+                          <div className="mt-2 p-2 rounded bg-accent/30 border-l-2 border-orange-500/30">
+                            <p className="text-xs text-muted-foreground italic">"{signal.sourceText}"</p>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -219,7 +347,7 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
             )}
 
             {/* Quotable Lines Section */}
-            {latestAnalysis.quotableLines.length > 0 && (
+            {quotableLines.length > 0 && (
               <section>
                 <button
                   className="flex items-center justify-between w-full text-left mb-2"
@@ -227,7 +355,7 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
                 >
                   <div className="flex items-center gap-2">
                     <Quote className="h-4 w-4 text-blue-500" />
-                    <h3 className="font-semibold text-sm">Quotable Lines ({latestAnalysis.quotableLines.length})</h3>
+                    <h3 className="font-semibold text-sm">Quotable Lines ({quotableLines.length})</h3>
                   </div>
                   {expandedSections.quotes ? (
                     <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -237,8 +365,8 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
                 </button>
                 {expandedSections.quotes && (
                   <div className="pl-6 space-y-2">
-                    {latestAnalysis.quotableLines.map((quote, index) => (
-                      <QuoteLine key={index} quote={quote} />
+                    {quotableLines.map((item, index) => (
+                      <VerifiedQuoteLine key={index} item={item} />
                     ))}
                   </div>
                 )}
@@ -270,34 +398,57 @@ export function AnalysisDisplay({ analyses, onReanalyze }: AnalysisDisplayProps)
         </ScrollArea>
       </CardContent>
     </Card>
+    </TooltipProvider>
   )
 }
 
-function QuoteLine({ quote }: { quote: string }) {
+function VerifiedQuoteLine({ item }: { item: VerifiedQuote }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(quote)
+    await navigator.clipboard.writeText(item.quote)
     setCopied(true)
     toast.success("Quote copied")
     setTimeout(() => setCopied(false), 2000)
   }
 
   return (
-    <div className="flex items-start gap-2 p-2.5 rounded-lg border bg-accent/20 group">
-      <blockquote className="flex-1 text-sm italic text-foreground/90 leading-relaxed">"{quote}"</blockquote>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="opacity-0 group-hover:opacity-100 h-6 w-6 shrink-0"
-        onClick={handleCopy}
-      >
-        {copied ? (
-          <Check className="h-3 w-3 text-green-500" />
-        ) : (
-          <Copy className="h-3 w-3" />
-        )}
-      </Button>
+    <div className="p-2.5 rounded-lg border bg-accent/20 group">
+      <div className="flex items-start gap-2">
+        <blockquote className="flex-1 text-sm italic text-foreground/90 leading-relaxed">"{item.quote}"</blockquote>
+        <div className="flex items-center gap-1 shrink-0">
+          {item.confidence && (
+            <Badge
+              variant={getConfidenceBadgeVariant(item.confidence)}
+              className={`text-xs ${getConfidenceColor(item.confidence)}`}
+            >
+              {item.confidence}%
+            </Badge>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="opacity-0 group-hover:opacity-100 h-6 w-6"
+            onClick={handleCopy}
+          >
+            {copied ? (
+              <Check className="h-3 w-3 text-green-500" />
+            ) : (
+              <Copy className="h-3 w-3" />
+            )}
+          </Button>
+        </div>
+      </div>
+      {(item.speaker || item.context) && (
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+          {item.speaker && (
+            <span className="font-medium">— {item.speaker}</span>
+          )}
+          {item.context && (
+            <span className="text-muted-foreground/70">| {item.context}</span>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -82,45 +82,77 @@ export const analyzeContent = inngest.createFunction(
         activePrompt = await step.run("create-default-prompt", async () => {
           return prisma.analysisPrompt.create({
             data: {
-              name: "Disruption Analysis",
-              description: "Default analysis prompt for disruption intelligence",
+              name: "Disruption Analysis (Verified)",
+              description: "Citation-based analysis with verification requirements",
               isDefault: true,
               isActive: true,
               systemPrompt: `You are an expert analyst specializing in disruptive technologies, exponential trends, and future-forward thinking. Analyze the following transcript and provide a structured analysis.
 
+CRITICAL VERIFICATION REQUIREMENTS:
+1. Every quote MUST be VERBATIM from the transcript - absolutely NO paraphrasing
+2. Include the approximate character position where the quote appears in the source
+3. If you cannot find exact supporting text for a claim, DO NOT include it
+4. Confidence scores: 100 = verbatim quote found, 80-99 = very close match, <80 = OMIT entirely
+5. Only include insights that can be directly traced to specific statements in the transcript
+
 OUTPUT FORMAT (JSON):
 {
-  "summary": "2-3 paragraph executive summary",
+  "summary": "2-3 paragraph executive summary based only on verified content from transcript",
   "keyInsights": [
-    "Insight 1 with specific detail",
-    "Insight 2 with specific detail"
+    {
+      "insight": "The specific insight with detail",
+      "sourceText": "The exact text from transcript supporting this insight",
+      "confidence": 80-100
+    }
   ],
   "disruptionSignals": [
     {
       "signal": "Name of the disruption",
       "sector": "Industry/sector affected",
       "timeframe": "Near-term/Mid-term/Long-term",
-      "confidence": "High/Medium/Low"
+      "sourceText": "Supporting quote from transcript",
+      "confidence": 80-100
     }
   ],
   "quotableLines": [
     {
-      "quote": "Exact quote from transcript",
-      "context": "Why this quote matters"
+      "quote": "EXACT verbatim quote from transcript - no changes allowed",
+      "sourcePosition": 12345,
+      "context": "Why this quote matters",
+      "speaker": "Name if identifiable, or 'Speaker'",
+      "confidence": 100
     }
   ],
   "relevanceScore": 0.0-1.0,
   "categories": ["AI", "Longevity", "Space", etc.],
-  "actionItems": ["Potential follow-up or research item"],
-  "relatedTopics": ["Topic for cross-referencing"]
+  "actionItems": [
+    {
+      "item": "Potential follow-up or research item",
+      "sourceText": "What in the transcript prompted this"
+    }
+  ],
+  "relatedTopics": ["Topic for cross-referencing"],
+  "verificationSummary": {
+    "totalClaims": 10,
+    "verifiedClaims": 10,
+    "averageConfidence": 95
+  }
 }
 
+VERIFICATION RULES:
+- Search the transcript for the EXACT text before including any quote
+- If a quote would require even minor rewording, find a different quote that IS verbatim
+- For insights, always cite the specific text that supports the insight
+- sourcePosition should be the approximate character index where the quote starts
+- Set confidence to 100 ONLY for exact verbatim matches
+- NEVER fabricate or embellish quotes - accuracy is paramount
+
 Focus on:
-- Specific predictions with timeframes
-- Named technologies, companies, or people
-- Contrarian or non-obvious insights
-- Quantitative claims (numbers, percentages, dates)
-- Implications for business strategy`,
+- Specific predictions with timeframes (cite the exact words used)
+- Named technologies, companies, or people (as mentioned in transcript)
+- Contrarian or non-obvious insights (with source citations)
+- Quantitative claims (numbers, percentages, dates - exactly as stated)
+- Implications for business strategy (grounded in transcript content)`,
             },
           })
         })
