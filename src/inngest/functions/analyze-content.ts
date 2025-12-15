@@ -47,6 +47,36 @@ export const analyzeContent = inngest.createFunction(
       throw new Error(error)
     }
 
+    // Skip analysis for content that's too short (e.g., link-only tweets)
+    const MIN_WORDS_FOR_ANALYSIS = 10
+    if (content.transcript.wordCount < MIN_WORDS_FOR_ANALYSIS) {
+      await logger.info("inngest", "skip-analysis", `Skipping analysis: content too short (${content.transcript.wordCount} words, minimum ${MIN_WORDS_FOR_ANALYSIS})`, {
+        contentId,
+        metadata: { wordCount: content.transcript.wordCount, minimum: MIN_WORDS_FOR_ANALYSIS },
+      })
+
+      // Mark as analyzed but with no analysis (insufficient content)
+      await step.run("mark-insufficient-content", async () => {
+        return prisma.content.update({
+          where: { id: contentId },
+          data: {
+            status: "ANALYZED",
+            metadata: {
+              ...(content.metadata as Record<string, unknown> || {}),
+              analysisSkipped: true,
+              skipReason: `Insufficient content (${content.transcript!.wordCount} words)`,
+            },
+          },
+        })
+      })
+
+      return {
+        analyzed: false,
+        skipped: true,
+        reason: `Content too short: ${content.transcript.wordCount} words (minimum: ${MIN_WORDS_FOR_ANALYSIS})`,
+      }
+    }
+
     // Step 2: Get the analysis prompt
     await logger.debug("inngest", "step-start", "Starting get-prompt step", { contentId })
 
