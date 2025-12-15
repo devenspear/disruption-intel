@@ -36,13 +36,15 @@ import {
   Clock,
   AlertCircle,
   Loader2,
-  FileText
+  FileText,
+  Twitter
 } from "lucide-react"
 
 // Content type icon component with modern styling
 function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: string }) {
   const isPodcast = type === "PODCAST_EPISODE" || sourceType === "PODCAST"
   const isArticle = type === "ARTICLE" || sourceType === "RSS"
+  const isTweet = type === "SOCIAL_POST" || sourceType === "TWITTER"
 
   if (isPodcast) {
     return (
@@ -56,6 +58,14 @@ function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: stri
     return (
       <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30">
         <FileText className="h-4 w-4 text-orange-400" />
+      </div>
+    )
+  }
+
+  if (isTweet) {
+    return (
+      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-sky-500/20 to-sky-600/20 border border-sky-500/30">
+        <Twitter className="h-4 w-4 text-sky-400" />
       </div>
     )
   }
