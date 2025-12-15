@@ -7,6 +7,7 @@ import { fetchTranscript } from "@/lib/ingestion/transcript"
 import { getLatestEpisodes } from "@/lib/ingestion/podcast"
 import { getLatestArticles } from "@/lib/ingestion/rss-article"
 import { fetchTweetsFromSource } from "@/lib/ingestion/twitter"
+import { inngest } from "@/inngest/client"
 import { Prisma } from "@prisma/client"
 
 export async function POST(
@@ -85,6 +86,12 @@ export async function POST(
                 data: { status: "PROCESSING" },
               })
 
+              // Trigger AI analysis via Inngest
+              await inngest.send({
+                name: "content/analyze",
+                data: { contentId: content.id },
+              })
+
               contentCreated++
             }
           } catch (transcriptError) {
@@ -159,6 +166,12 @@ export async function POST(
           await prisma.content.update({
             where: { id: content.id },
             data: { status: "PROCESSING" },
+          })
+
+          // Trigger AI analysis via Inngest
+          await inngest.send({
+            name: "content/analyze",
+            data: { contentId: content.id },
           })
 
           contentCreated++
@@ -255,6 +268,12 @@ export async function POST(
             await prisma.content.update({
               where: { id: content.id },
               data: { status: "PROCESSING" },
+            })
+
+            // Trigger AI analysis via Inngest
+            await inngest.send({
+              name: "content/analyze",
+              data: { contentId: content.id },
             })
 
             contentCreated++
