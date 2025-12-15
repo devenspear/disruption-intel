@@ -234,8 +234,24 @@ export function ContentTable({
               onSort={onSort}
             />
           </TableHead>
-          <TableHead className="w-[100px]">Source</TableHead>
-          <TableHead className="w-[120px]">Status</TableHead>
+          <TableHead className="w-[100px]">
+            <SortableHeader
+              column="sourceName"
+              label="Source"
+              currentSort={sortBy}
+              currentOrder={sortOrder}
+              onSort={onSort}
+            />
+          </TableHead>
+          <TableHead className="w-[120px]">
+            <SortableHeader
+              column="status"
+              label="Status"
+              currentSort={sortBy}
+              currentOrder={sortOrder}
+              onSort={onSort}
+            />
+          </TableHead>
           <TableHead className="w-[80px]">
             <SortableHeader
               column="wordCount"
@@ -245,7 +261,15 @@ export function ContentTable({
               onSort={onSort}
             />
           </TableHead>
-          <TableHead className="w-[70px]">Score</TableHead>
+          <TableHead className="w-[70px]">
+            <SortableHeader
+              column="relevanceScore"
+              label="Score"
+              currentSort={sortBy}
+              currentOrder={sortOrder}
+              onSort={onSort}
+            />
+          </TableHead>
           <TableHead className="w-[100px]">
             <SortableHeader
               column="publishedAt"
