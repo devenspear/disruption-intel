@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
+import { prisma } from "@/lib/db"
 
 // Approximate pricing per 1M tokens (input rate used as average)
 const MODEL_PRICING: Record<string, number> = {
