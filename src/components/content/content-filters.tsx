@@ -22,6 +22,7 @@ interface ContentFiltersProps {
     search: string
     status: string
     sourceId: string
+    sourceType: string
     sortBy: string
     sortOrder: string
   }
@@ -36,7 +37,7 @@ export function ContentFilters({
   onReset,
 }: ContentFiltersProps) {
   const hasFilters =
-    filters.search || filters.status !== "all" || filters.sourceId !== "all"
+    filters.search || filters.status !== "all" || filters.sourceId !== "all" || filters.sourceType !== "all"
 
   return (
     <div className="flex flex-wrap gap-4 items-center">
@@ -49,6 +50,24 @@ export function ContentFilters({
           className="pl-9"
         />
       </div>
+
+      <Select
+        value={filters.sourceType}
+        onValueChange={(value) => onFilterChange("sourceType", value)}
+      >
+        <SelectTrigger className="w-[140px]">
+          <SelectValue placeholder="Type" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Types</SelectItem>
+          <SelectItem value="YOUTUBE_CHANNEL">YouTube</SelectItem>
+          <SelectItem value="PODCAST">Podcast</SelectItem>
+          <SelectItem value="RSS">RSS</SelectItem>
+          <SelectItem value="SUBSTACK">Substack</SelectItem>
+          <SelectItem value="TWITTER">Twitter/X</SelectItem>
+          <SelectItem value="MANUAL">Manual</SelectItem>
+        </SelectContent>
+      </Select>
 
       <Select
         value={filters.status}

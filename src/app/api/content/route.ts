@@ -12,6 +12,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get("status")
   const sourceId = searchParams.get("sourceId")
+  const sourceType = searchParams.get("sourceType")
   const search = searchParams.get("search")
   const sortBy = searchParams.get("sortBy") || "publishedAt"
   const sortOrder = searchParams.get("sortOrder") || "desc"
@@ -26,6 +27,10 @@ export async function GET(request: Request) {
 
   if (sourceId) {
     where.sourceId = sourceId
+  }
+
+  if (sourceType) {
+    where.source = { type: sourceType }
   }
 
   if (search) {

@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { format } from "date-fns"
+import { useState, useRef, useCallback, useEffect } from "react"
 import {
   Table,
   TableBody,
@@ -37,8 +38,95 @@ import {
   AlertCircle,
   Loader2,
   FileText,
-  Twitter
+  Twitter,
+  GripVertical
 } from "lucide-react"
+
+// Default column widths
+const DEFAULT_COLUMN_WIDTHS = {
+  checkbox: 40,
+  type: 60,
+  title: 300,
+  source: 120,
+  status: 110,
+  words: 80,
+  score: 70,
+  published: 100,
+  actions: 50,
+}
+
+const STORAGE_KEY = "disruption-intel-column-widths"
+
+// Load column widths from localStorage
+function loadColumnWidths(): typeof DEFAULT_COLUMN_WIDTHS {
+  if (typeof window === "undefined") return DEFAULT_COLUMN_WIDTHS
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY)
+    if (saved) {
+      return { ...DEFAULT_COLUMN_WIDTHS, ...JSON.parse(saved) }
+    }
+  } catch {
+    // ignore
+  }
+  return DEFAULT_COLUMN_WIDTHS
+}
+
+// Save column widths to localStorage
+function saveColumnWidths(widths: typeof DEFAULT_COLUMN_WIDTHS) {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(widths))
+  } catch {
+    // ignore
+  }
+}
+
+// Resize handle component
+function ResizeHandle({ onResize }: { onResize: (delta: number) => void }) {
+  const [isDragging, setIsDragging] = useState(false)
+  const startXRef = useRef(0)
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsDragging(true)
+    startXRef.current = e.clientX
+  }
+
+  useEffect(() => {
+    if (!isDragging) return
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const delta = e.clientX - startXRef.current
+      if (Math.abs(delta) > 2) {
+        onResize(delta)
+        startXRef.current = e.clientX
+      }
+    }
+
+    const handleMouseUp = () => {
+      setIsDragging(false)
+    }
+
+    document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("mouseup", handleMouseUp)
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("mouseup", handleMouseUp)
+    }
+  }, [isDragging, onResize])
+
+  return (
+    <div
+      className={`absolute right-0 top-0 h-full w-4 cursor-col-resize flex items-center justify-center z-10 group/resize ${
+        isDragging ? "bg-primary/20" : "hover:bg-muted/50"
+      }`}
+      onMouseDown={handleMouseDown}
+    >
+      <GripVertical className={`h-3 w-3 ${isDragging ? "text-primary" : "text-muted-foreground/50 group-hover/resize:text-muted-foreground"}`} />
+    </div>
+  )
+}
 
 // Content type icon component with modern styling
 function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: string }) {
@@ -212,6 +300,22 @@ export function ContentTable({
   selectedIds = new Set(),
   onSelectionChange
 }: ContentTableProps) {
+  const [columnWidths, setColumnWidths] = useState(DEFAULT_COLUMN_WIDTHS)
+
+  // Load saved column widths on mount
+  useEffect(() => {
+    setColumnWidths(loadColumnWidths())
+  }, [])
+
+  const handleResize = useCallback((column: keyof typeof DEFAULT_COLUMN_WIDTHS, delta: number) => {
+    setColumnWidths(prev => {
+      const newWidth = Math.max(40, prev[column] + delta)
+      const newWidths = { ...prev, [column]: newWidth }
+      saveColumnWidths(newWidths)
+      return newWidths
+    })
+  }, [])
+
   const allSelected = contents.length > 0 && contents.every(c => selectedIds.has(c.id))
   const someSelected = contents.some(c => selectedIds.has(c.id)) && !allSelected
 
@@ -240,196 +344,207 @@ export function ContentTable({
   }
 
   return (
-    <Table className="w-full table-fixed">
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          <TableHead className="w-[40px]">
-            <Checkbox
-              checked={allSelected}
-              ref={(el) => {
-                if (el) {
-                  (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = someSelected
-                }
-              }}
-              onCheckedChange={handleSelectAll}
-              aria-label="Select all"
-            />
-          </TableHead>
-          <TableHead className="w-[60px]">Type</TableHead>
-          <TableHead>
-            <SortableHeader
-              column="title"
-              label="Title"
-              currentSort={sortBy}
-              currentOrder={sortOrder}
-              onSort={onSort}
-            />
-          </TableHead>
-          <TableHead className="w-[100px]">
-            <SortableHeader
-              column="sourceName"
-              label="Source"
-              currentSort={sortBy}
-              currentOrder={sortOrder}
-              onSort={onSort}
-            />
-          </TableHead>
-          <TableHead className="w-[120px]">
-            <SortableHeader
-              column="status"
-              label="Status"
-              currentSort={sortBy}
-              currentOrder={sortOrder}
-              onSort={onSort}
-            />
-          </TableHead>
-          <TableHead className="w-[80px]">
-            <SortableHeader
-              column="wordCount"
-              label="Words"
-              currentSort={sortBy}
-              currentOrder={sortOrder}
-              onSort={onSort}
-            />
-          </TableHead>
-          <TableHead className="w-[70px]">
-            <SortableHeader
-              column="relevanceScore"
-              label="Score"
-              currentSort={sortBy}
-              currentOrder={sortOrder}
-              onSort={onSort}
-            />
-          </TableHead>
-          <TableHead className="w-[100px]">
-            <SortableHeader
-              column="publishedAt"
-              label="Published"
-              currentSort={sortBy}
-              currentOrder={sortOrder}
-              onSort={onSort}
-            />
-          </TableHead>
-          <TableHead className="w-[50px]"></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {contents.map((content) => {
-          const isSelected = selectedIds.has(content.id)
-          return (
-            <TableRow
-              key={content.id}
-              className={`group ${isSelected ? 'bg-primary/5' : ''}`}
-            >
-              <TableCell className="w-[40px]">
-                <Checkbox
-                  checked={isSelected}
-                  onCheckedChange={(checked) => handleSelectOne(content.id, checked as boolean)}
-                  aria-label={`Select ${content.title}`}
-                />
-              </TableCell>
-              <TableCell className="w-[60px]">
-                <ContentTypeIcon type={content.contentType} sourceType={content.source.type} />
-              </TableCell>
-              <TableCell className="max-w-0">
-                <Link
-                  href={`/content/${content.id}`}
-                  className="font-medium hover:text-primary truncate block transition-colors"
-                  title={content.title}
-                >
-                  {content.title}
-                </Link>
-              </TableCell>
-              <TableCell className="w-[100px]">
-                <Badge variant="secondary" className="truncate max-w-full font-normal">
-                  {content.source.name}
-                </Badge>
-              </TableCell>
-              <TableCell className="w-[120px]">
-                <StatusBadge status={content.status} />
-              </TableCell>
-              <TableCell className="w-[80px]">
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <FileText className="h-3 w-3" />
-                  {content.transcript?.wordCount?.toLocaleString() || "-"}
-                </div>
-              </TableCell>
-              <TableCell className="w-[70px]">
-                {content.analyses[0]?.relevanceScore ? (
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="w-2 h-2 rounded-full"
-                      style={{
-                        backgroundColor: content.analyses[0].relevanceScore >= 0.8
-                          ? '#22c55e'
-                          : content.analyses[0].relevanceScore >= 0.5
-                          ? '#f59e0b'
-                          : '#ef4444'
-                      }}
-                    />
-                    <span className="text-sm font-medium">
-                      {(content.analyses[0].relevanceScore * 100).toFixed(0)}%
-                    </span>
+    <div className="overflow-x-auto">
+      <Table style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 0) }}>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead style={{ width: columnWidths.checkbox }} className="relative">
+              <Checkbox
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) {
+                    (el as HTMLButtonElement & { indeterminate: boolean }).indeterminate = someSelected
+                  }
+                }}
+                onCheckedChange={handleSelectAll}
+                aria-label="Select all"
+              />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.type }} className="relative">
+              Type
+              <ResizeHandle onResize={(delta) => handleResize("type", delta)} />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.title }} className="relative">
+              <SortableHeader
+                column="title"
+                label="Title"
+                currentSort={sortBy}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              />
+              <ResizeHandle onResize={(delta) => handleResize("title", delta)} />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.source }} className="relative">
+              <SortableHeader
+                column="sourceName"
+                label="Source"
+                currentSort={sortBy}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              />
+              <ResizeHandle onResize={(delta) => handleResize("source", delta)} />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.status }} className="relative">
+              <SortableHeader
+                column="status"
+                label="Status"
+                currentSort={sortBy}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              />
+              <ResizeHandle onResize={(delta) => handleResize("status", delta)} />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.words }} className="relative">
+              <SortableHeader
+                column="wordCount"
+                label="Words"
+                currentSort={sortBy}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              />
+              <ResizeHandle onResize={(delta) => handleResize("words", delta)} />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.score }} className="relative">
+              <SortableHeader
+                column="relevanceScore"
+                label="Score"
+                currentSort={sortBy}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              />
+              <ResizeHandle onResize={(delta) => handleResize("score", delta)} />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.published }} className="relative">
+              <SortableHeader
+                column="publishedAt"
+                label="Published"
+                currentSort={sortBy}
+                currentOrder={sortOrder}
+                onSort={onSort}
+              />
+              <ResizeHandle onResize={(delta) => handleResize("published", delta)} />
+            </TableHead>
+            <TableHead style={{ width: columnWidths.actions }}></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {contents.map((content) => {
+            const isSelected = selectedIds.has(content.id)
+            return (
+              <TableRow
+                key={content.id}
+                className={`group ${isSelected ? 'bg-primary/5' : ''}`}
+              >
+                <TableCell style={{ width: columnWidths.checkbox }}>
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={(checked) => handleSelectOne(content.id, checked as boolean)}
+                    aria-label={`Select ${content.title}`}
+                  />
+                </TableCell>
+                <TableCell style={{ width: columnWidths.type }}>
+                  <ContentTypeIcon type={content.contentType} sourceType={content.source.type} />
+                </TableCell>
+                <TableCell style={{ width: columnWidths.title, maxWidth: columnWidths.title }}>
+                  <Link
+                    href={`/content/${content.id}`}
+                    className="font-medium hover:text-primary truncate block transition-colors"
+                    title={content.title}
+                  >
+                    {content.title}
+                  </Link>
+                </TableCell>
+                <TableCell style={{ width: columnWidths.source, maxWidth: columnWidths.source }}>
+                  <Badge variant="secondary" className="truncate max-w-full font-normal">
+                    {content.source.name}
+                  </Badge>
+                </TableCell>
+                <TableCell style={{ width: columnWidths.status }}>
+                  <StatusBadge status={content.status} />
+                </TableCell>
+                <TableCell style={{ width: columnWidths.words }}>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <FileText className="h-3 w-3" />
+                    {content.transcript?.wordCount?.toLocaleString() || "-"}
                   </div>
-                ) : (
-                  <span className="text-muted-foreground">-</span>
-                )}
-              </TableCell>
-              <TableCell className="w-[100px] text-sm text-muted-foreground">
-                {format(new Date(content.publishedAt), "MMM d, yy")}
-              </TableCell>
-              <TableCell className="w-[50px]">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem asChild>
-                      <Link href={`/content/${content.id}`} className="gap-2">
-                        <Eye className="h-4 w-4" />
-                        View Details
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onAnalyze(content.id)} className="gap-2">
-                      <Sparkles className="h-4 w-4" />
-                      Run Analysis
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <a
-                        href={content.originalUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="gap-2"
+                </TableCell>
+                <TableCell style={{ width: columnWidths.score }}>
+                  {content.analyses[0]?.relevanceScore ? (
+                    <div className="flex items-center gap-1">
+                      <div
+                        className="w-2 h-2 rounded-full"
+                        style={{
+                          backgroundColor: content.analyses[0].relevanceScore >= 0.8
+                            ? '#22c55e'
+                            : content.analyses[0].relevanceScore >= 0.5
+                            ? '#f59e0b'
+                            : '#ef4444'
+                        }}
+                      />
+                      <span className="text-sm font-medium">
+                        {(content.analyses[0].relevanceScore * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-muted-foreground">-</span>
+                  )}
+                </TableCell>
+                <TableCell style={{ width: columnWidths.published }} className="text-sm text-muted-foreground">
+                  {format(new Date(content.publishedAt), "MMM d, yy")}
+                </TableCell>
+                <TableCell style={{ width: columnWidths.actions }}>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                       >
-                        <ExternalLink className="h-4 w-4" />
-                        Open Original
-                      </a>
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => onArchive(content.id)} className="gap-2">
-                      <Archive className="h-4 w-4" />
-                      Archive
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="gap-2 text-destructive focus:text-destructive"
-                      onClick={() => onDelete(content.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
-            </TableRow>
-          )
-        })}
-      </TableBody>
-    </Table>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuItem asChild>
+                        <Link href={`/content/${content.id}`} className="gap-2">
+                          <Eye className="h-4 w-4" />
+                          View Details
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onAnalyze(content.id)} className="gap-2">
+                        <Sparkles className="h-4 w-4" />
+                        Run Analysis
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <a
+                          href={content.originalUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="gap-2"
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                          Open Original
+                        </a>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => onArchive(content.id)} className="gap-2">
+                        <Archive className="h-4 w-4" />
+                        Archive
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="gap-2 text-destructive focus:text-destructive"
+                        onClick={() => onDelete(content.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+    </div>
   )
 }

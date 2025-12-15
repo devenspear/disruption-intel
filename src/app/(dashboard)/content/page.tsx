@@ -33,6 +33,7 @@ function ContentPageContent() {
     search: searchParams.get("search") || "",
     status: searchParams.get("status") || "all",
     sourceId: searchParams.get("sourceId") || "all",
+    sourceType: searchParams.get("sourceType") || "all",
     sortBy: searchParams.get("sortBy") || "publishedAt",
     sortOrder: (searchParams.get("sortOrder") || "desc") as "asc" | "desc",
   })
@@ -49,6 +50,7 @@ function ContentPageContent() {
       if (filters.search) params.set("search", filters.search)
       if (filters.status !== "all") params.set("status", filters.status)
       if (filters.sourceId !== "all") params.set("sourceId", filters.sourceId)
+      if (filters.sourceType !== "all") params.set("sourceType", filters.sourceType)
       params.set("sortBy", filters.sortBy)
       params.set("sortOrder", filters.sortOrder)
       params.set("page", pageNum.toString())
@@ -164,6 +166,7 @@ function ContentPageContent() {
       search: "",
       status: "all",
       sourceId: "all",
+      sourceType: "all",
       sortBy: "publishedAt",
       sortOrder: "desc",
     })
