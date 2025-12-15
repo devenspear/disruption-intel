@@ -207,19 +207,18 @@ export default function SourcesPage() {
           <AddSourceDialog onAdd={handleAddSource} />
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(240px,280px))]">
           {sortedSources.map((source) => (
-            <div key={source.id} className="max-w-xs w-full">
-              <SourceCard
-                source={source}
-                onToggleActive={handleToggleActive}
-                onDelete={handleDelete}
-                onCheck={handleCheck}
-                onProcess={handleProcess}
-                onEdit={handleEdit}
-                isProcessing={processingId === source.id}
-              />
-            </div>
+            <SourceCard
+              key={source.id}
+              source={source}
+              onToggleActive={handleToggleActive}
+              onDelete={handleDelete}
+              onCheck={handleCheck}
+              onProcess={handleProcess}
+              onEdit={handleEdit}
+              isProcessing={processingId === source.id}
+            />
           ))}
         </div>
       )}
