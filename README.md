@@ -1,8 +1,12 @@
-# Disruption Intel
+# Disruption Radar
+
+**AI-Powered Trend Intelligence by Deven Spear**
 
 A content intelligence platform for monitoring, transcribing, and analyzing video and podcast content from thought leaders in tech, AI, and venture capital.
 
-**Live**: [https://disruption-intel.vercel.app](https://disruption-intel.vercel.app)
+**Live**: [https://disrad.deven.network](https://disrad.deven.network)
+
+> **Note**: This is proprietary software. Unauthorized use, distribution, or modification is prohibited.
 
 ## Features
 

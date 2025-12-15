@@ -1,11 +1,14 @@
 {
-  "name": "disruption-intel",
+  "name": "disruption-radar",
   "version": "0.1.1",
   "private": true,
+  "description": "AI-Powered Trend Intelligence by Deven Spear",
   "repository": {
     "type": "git",
     "url": "https://github.com/devenspear/disruption-intel"
   },
+  "author": "Deven Spear",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",

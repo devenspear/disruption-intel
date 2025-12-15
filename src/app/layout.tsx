@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Disruption Intelligence Engine",
-  description: "Automated discovery, analysis, and curation of disruptive technology content",
+  title: "Disruption Radar | AI-Powered Trend Intelligence",
+  description: "Automated discovery, analysis, and curation of disruptive technology content. By Deven Spear.",
 }
 
 export default function RootLayout({
