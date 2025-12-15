@@ -154,8 +154,14 @@ const settingsLinks = [
 ]
 
 interface PurgeStats {
-  wouldPurge: { transcripts: number; logs: number }
-  totals: { transcripts: number; logs: number }
+  wouldPurge: { content: number; logs: number }
+  totals: { content: number; logs: number }
+  sampleContent?: Array<{
+    id: string
+    title: string
+    publishedAt: string
+    source: { name: string }
+  }>
   cutoffDate: string
   retentionDays: number
 }
@@ -241,7 +247,7 @@ export default function SettingsPage() {
       if (res.ok) {
         const data = await res.json()
         toast.success(
-          `Purged ${data.purged.transcripts} transcripts and ${data.purged.logs} logs`
+          `Purged ${data.purged.content} content items, ${data.purged.transcripts} transcripts, ${data.purged.analyses} analyses, and ${data.purged.logs} logs`
         )
         setShowPurgeDialog(false)
         setConfirmText("")
@@ -722,7 +728,7 @@ export default function SettingsPage() {
             Data Management
           </CardTitle>
           <CardDescription>
-            Configure data retention and purge old transcripts to save storage
+            Configure data retention and purge old content to save storage
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -763,7 +769,7 @@ export default function SettingsPage() {
               <div>
                 <p className="font-medium">Retention Period</p>
                 <p className="text-sm text-muted-foreground">
-                  Transcripts and logs older than this will be eligible for purging
+                  Content published before this period will be eligible for deletion
                 </p>
               </div>
               <Select value={retentionDays} onValueChange={handleRetentionChange}>
@@ -792,22 +798,35 @@ export default function SettingsPage() {
                       Calculating...
                     </div>
                   ) : purgeStats ? (
-                    <div className="mt-2 space-y-2">
+                    <div className="mt-2 space-y-3">
                       <p className="text-sm text-muted-foreground">
-                        Items older than {formatDistanceToNow(new Date(purgeStats.cutoffDate))} ago:
+                        Content published before {format(new Date(purgeStats.cutoffDate), "MMM d, yyyy")}:
                       </p>
                       <div className="flex gap-4">
                         <div className="text-sm">
-                          <span className="font-medium text-foreground">{purgeStats.wouldPurge.transcripts}</span>
-                          <span className="text-muted-foreground"> / {purgeStats.totals.transcripts} transcripts</span>
+                          <span className="font-medium text-foreground">{purgeStats.wouldPurge.content}</span>
+                          <span className="text-muted-foreground"> / {purgeStats.totals.content} content items</span>
                         </div>
                         <div className="text-sm">
                           <span className="font-medium text-foreground">{purgeStats.wouldPurge.logs}</span>
                           <span className="text-muted-foreground"> / {purgeStats.totals.logs} logs</span>
                         </div>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Note: Analyses are preserved permanently. Only raw transcripts and logs are purged.
+                      {purgeStats.sampleContent && purgeStats.sampleContent.length > 0 && (
+                        <div className="text-xs space-y-1 mt-2 p-2 rounded bg-background/50">
+                          <p className="font-medium text-muted-foreground">Sample items to be deleted:</p>
+                          {purgeStats.sampleContent.slice(0, 3).map((item) => (
+                            <p key={item.id} className="truncate text-muted-foreground">
+                              • {item.title} ({item.source.name}, {format(new Date(item.publishedAt), "MMM d, yyyy")})
+                            </p>
+                          ))}
+                          {purgeStats.sampleContent.length > 3 && (
+                            <p className="text-muted-foreground">...and {purgeStats.wouldPurge.content - 3} more</p>
+                          )}
+                        </div>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Note: Deleting content also removes its transcripts and analyses.
                       </p>
                     </div>
                   ) : (
@@ -822,13 +841,13 @@ export default function SettingsPage() {
               <div>
                 <p className="font-medium text-destructive">Purge Now</p>
                 <p className="text-sm text-muted-foreground">
-                  Permanently delete old transcripts and logs. This cannot be undone.
+                  Permanently delete old content and all related data. This cannot be undone.
                 </p>
               </div>
               <Button
                 variant="destructive"
                 onClick={openPurgeDialog}
-                disabled={isPurging || !purgeStats || (purgeStats.wouldPurge.transcripts === 0 && purgeStats.wouldPurge.logs === 0)}
+                disabled={isPurging || !purgeStats || (purgeStats.wouldPurge.content === 0 && purgeStats.wouldPurge.logs === 0)}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Purge Data
@@ -858,21 +877,36 @@ export default function SettingsPage() {
                   <p className="font-medium mb-2">You are about to permanently delete:</p>
                   <ul className="space-y-1 text-sm">
                     <li className="flex items-center gap-2">
-                      <span className="font-bold text-lg">{purgeStats.wouldPurge.transcripts}</span>
-                      <span className="text-muted-foreground">transcripts (content published before {format(new Date(purgeStats.cutoffDate), "MMM d, yyyy")})</span>
+                      <span className="font-bold text-lg">{purgeStats.wouldPurge.content}</span>
+                      <span className="text-muted-foreground">content items (published before {format(new Date(purgeStats.cutoffDate), "MMM d, yyyy")})</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="font-bold text-lg">{purgeStats.wouldPurge.logs}</span>
                       <span className="text-muted-foreground">system logs</span>
                     </li>
                   </ul>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This will also delete all transcripts and analyses for these items.
+                  </p>
                 </div>
+
+                {purgeStats.sampleContent && purgeStats.sampleContent.length > 0 && (
+                  <div className="text-sm text-muted-foreground">
+                    <p className="mb-2 font-medium">Sample items that will be deleted:</p>
+                    <ul className="space-y-1 text-xs max-h-32 overflow-y-auto">
+                      {purgeStats.sampleContent.map((item) => (
+                        <li key={item.id} className="truncate">
+                          • {item.title} ({item.source.name})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="text-sm text-muted-foreground">
                   <p className="mb-2">What will be preserved:</p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li>All AI analyses (permanently kept)</li>
-                    <li>Content records and metadata</li>
+                    <li>Recent content (published after {format(new Date(purgeStats.cutoffDate), "MMM d, yyyy")})</li>
                     <li>Source configurations</li>
                   </ul>
                 </div>

@@ -3,8 +3,9 @@ import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/db"
 import { authOptions } from "@/lib/auth"
 
-// POST - Purge old transcripts (keeps analyses)
-// Purges based on content's publishedAt date, not transcript's createdAt
+// POST - Purge old content and related data
+// Purges based on content's publishedAt date
+// Deletes: Content records, their transcripts, and their analyses
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) {
@@ -19,23 +20,23 @@ export async function POST(request: Request) {
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
 
-    // Find transcripts for content published before cutoff date
-    const transcriptsToDelete = await prisma.transcript.findMany({
+    // Count content to be deleted (for response)
+    const contentCount = await prisma.content.count({
+      where: {
+        publishedAt: { lt: cutoffDate },
+      },
+    })
+
+    // Delete analyses for old content first (foreign key constraint)
+    const deletedAnalyses = await prisma.analysis.deleteMany({
       where: {
         content: {
           publishedAt: { lt: cutoffDate },
         },
       },
-      select: { id: true },
     })
 
-    const logCount = await prisma.systemLog.count({
-      where: {
-        createdAt: { lt: cutoffDate },
-      },
-    })
-
-    // Delete transcripts for old content (based on content's publishedAt)
+    // Delete transcripts for old content (foreign key constraint)
     const deletedTranscripts = await prisma.transcript.deleteMany({
       where: {
         content: {
@@ -44,29 +45,26 @@ export async function POST(request: Request) {
       },
     })
 
-    // Delete old system logs (still use createdAt for logs)
+    // Delete the old content records themselves
+    const deletedContent = await prisma.content.deleteMany({
+      where: {
+        publishedAt: { lt: cutoffDate },
+      },
+    })
+
+    // Delete old system logs
     const deletedLogs = await prisma.systemLog.deleteMany({
       where: {
         createdAt: { lt: cutoffDate },
       },
     })
 
-    // Update content status for items with deleted transcripts
-    // (They'll need to be re-processed if needed)
-    await prisma.content.updateMany({
-      where: {
-        transcript: null,
-        status: { in: ["ANALYZED", "PROCESSING"] },
-      },
-      data: {
-        status: "PENDING",
-      },
-    })
-
     return NextResponse.json({
       success: true,
       purged: {
+        content: deletedContent.count,
         transcripts: deletedTranscripts.count,
+        analyses: deletedAnalyses.count,
         logs: deletedLogs.count,
       },
       cutoffDate: cutoffDate.toISOString(),
@@ -97,12 +95,10 @@ export async function GET(request: Request) {
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
 
-    // Count transcripts for content published before cutoff date
-    const transcriptCount = await prisma.transcript.count({
+    // Count content published before cutoff date
+    const contentCount = await prisma.content.count({
       where: {
-        content: {
-          publishedAt: { lt: cutoffDate },
-        },
+        publishedAt: { lt: cutoffDate },
       },
     })
 
@@ -114,18 +110,34 @@ export async function GET(request: Request) {
     })
 
     // Get total counts for context
-    const totalTranscripts = await prisma.transcript.count()
+    const totalContent = await prisma.content.count()
     const totalLogs = await prisma.systemLog.count()
+
+    // Get sample of content that would be purged (for user verification)
+    const sampleContent = await prisma.content.findMany({
+      where: {
+        publishedAt: { lt: cutoffDate },
+      },
+      select: {
+        id: true,
+        title: true,
+        publishedAt: true,
+        source: { select: { name: true } },
+      },
+      orderBy: { publishedAt: "asc" },
+      take: 10,
+    })
 
     return NextResponse.json({
       wouldPurge: {
-        transcripts: transcriptCount,
+        content: contentCount,
         logs: logCount,
       },
       totals: {
-        transcripts: totalTranscripts,
+        content: totalContent,
         logs: totalLogs,
       },
+      sampleContent,
       cutoffDate: cutoffDate.toISOString(),
       retentionDays,
     })
