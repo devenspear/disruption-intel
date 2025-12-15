@@ -11,23 +11,110 @@ import * as cheerio from 'cheerio'
 const TWITTER_API_BASE = 'https://api.twitterapi.io/twitter'
 
 /**
- * Fetch full article content from a Twitter Article URL
+ * Fetch full article content from a Twitter Article URL using Jina AI Reader
+ * This handles JavaScript-rendered pages like X.com articles
+ *
  * Twitter Articles are long-form posts stored at URLs like:
  * https://x.com/i/article/2000566143803686919
+ * or directly on the tweet URL like:
+ * https://x.com/alexwg/status/2000567264353927485
  */
-export async function fetchArticleContent(articleUrl: string): Promise<string | null> {
-  try {
-    logger.info('twitter', 'fetchArticleContent', `Fetching article from ${articleUrl}`)
+async function fetchArticleWithJinaReader(url: string): Promise<string | null> {
+  const FETCH_TIMEOUT_MS = 15000 // 15 seconds for Jina - it needs time to render JS
 
-    const response = await fetch(articleUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; DisruptionRadar/1.0)',
-        'Accept': 'text/html,application/xhtml+xml',
-      },
-    })
+  try {
+    logger.info('twitter', 'fetchArticleWithJinaReader', `Fetching via Jina Reader: ${url}`)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+    // Jina AI Reader - free service that renders JS and extracts content
+    const jinaUrl = `https://r.jina.ai/${url}`
+
+    let response: Response
+    try {
+      response = await fetch(jinaUrl, {
+        headers: {
+          'Accept': 'text/plain',
+        },
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeoutId)
+    }
 
     if (!response.ok) {
-      logger.warn('twitter', 'fetchArticleContent', `Failed to fetch article: ${response.status}`)
+      logger.warn('twitter', 'fetchArticleWithJinaReader', `Jina Reader failed: ${response.status}`)
+      return null
+    }
+
+    const content = await response.text()
+
+    // Jina returns markdown - clean it up
+    if (content && content.length > 100) {
+      // Remove any jina-specific headers/footers
+      const cleaned = content
+        .replace(/^Title:.*\n/m, '')
+        .replace(/^URL Source:.*\n/m, '')
+        .replace(/^Markdown Content:\n/m, '')
+        .trim()
+
+      logger.info('twitter', 'fetchArticleWithJinaReader', `Got content: ${cleaned.length} chars`)
+      return cleaned
+    }
+
+    return null
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      logger.warn('twitter', 'fetchArticleWithJinaReader', `Timeout after 15s: ${url}`)
+    } else {
+      logger.warn('twitter', 'fetchArticleWithJinaReader', `Error: ${error}`)
+    }
+    return null
+  }
+}
+
+/**
+ * Fetch full article content from a Twitter Article URL
+ * Tries multiple methods in order:
+ * 1. Jina AI Reader (handles JS rendering)
+ * 2. Direct HTML scraping (fallback)
+ *
+ * NOTE: X.com often blocks/rate-limits scraping requests, so we use timeouts
+ * and fall back to preview text if all methods fail.
+ */
+export async function fetchArticleContent(articleUrl: string): Promise<string | null> {
+  // First try Jina Reader - best for JS-rendered content like Twitter Articles
+  const jinaContent = await fetchArticleWithJinaReader(articleUrl)
+  if (jinaContent && jinaContent.length > 200) {
+    return jinaContent
+  }
+
+  // Fallback: Try direct scraping with short timeout
+  const FETCH_TIMEOUT_MS = 5000
+
+  try {
+    logger.info('twitter', 'fetchArticleContent', `Trying direct fetch: ${articleUrl}`)
+
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+
+    let response: Response
+    try {
+      response = await fetch(articleUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeoutId)
+    }
+
+    if (!response.ok) {
+      logger.warn('twitter', 'fetchArticleContent', `Direct fetch failed: ${response.status}`)
       return null
     }
 
@@ -35,7 +122,6 @@ export async function fetchArticleContent(articleUrl: string): Promise<string | 
     const $ = cheerio.load(html)
 
     // Try to extract article content from various selectors
-    // Twitter Articles typically have content in article tags or specific data attributes
     let content = ''
 
     // Try article tag
@@ -58,8 +144,6 @@ export async function fetchArticleContent(articleUrl: string): Promise<string | 
         const scriptContent = $(el).html() || ''
         if (scriptContent.includes('"article_results"') || scriptContent.includes('"body_text"')) {
           try {
-            // Try to extract JSON and find article body
-            // Use [\s\S] instead of 's' flag for multiline matching
             const jsonMatch = scriptContent.match(/\{[\s\S]*"body_text"[\s\S]*\}/)
             if (jsonMatch) {
               const data = JSON.parse(jsonMatch[0])
@@ -75,14 +159,18 @@ export async function fetchArticleContent(articleUrl: string): Promise<string | 
     }
 
     if (content && content.length > 100) {
-      logger.info('twitter', 'fetchArticleContent', `Fetched article content: ${content.length} chars`)
+      logger.info('twitter', 'fetchArticleContent', `Direct fetch got: ${content.length} chars`)
       return content
     }
 
     logger.warn('twitter', 'fetchArticleContent', 'Could not extract article content')
     return null
   } catch (error) {
-    logger.error('twitter', 'fetchArticleContent', `Error fetching article: ${error}`)
+    if (error instanceof Error && error.name === 'AbortError') {
+      logger.warn('twitter', 'fetchArticleContent', `Timeout after 5s: ${articleUrl}`)
+    } else {
+      logger.error('twitter', 'fetchArticleContent', `Error: ${error}`)
+    }
     return null
   }
 }
