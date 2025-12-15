@@ -50,25 +50,29 @@ interface SummaryResponse {
   generatedAt?: string
 }
 
-const STORAGE_KEY = "disruption-intel-briefing"
-
 export default function AnalysisPage() {
   const [days, setDays] = useState("7")
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingInitial, setIsLoadingInitial] = useState(true)
   const [summary, setSummary] = useState<SummaryResponse | null>(null)
   const [copied, setCopied] = useState(false)
 
-  // Load saved summary from localStorage on mount
+  // Load saved summary from database on mount
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
+    const loadBriefing = async () => {
       try {
-        const parsed = JSON.parse(saved)
-        setSummary(parsed)
+        const res = await fetch("/api/briefings")
+        const data = await res.json()
+        if (data.briefing) {
+          setSummary(data.briefing)
+        }
       } catch (e) {
-        console.error("Failed to parse saved briefing:", e)
+        console.error("Failed to load saved briefing:", e)
+      } finally {
+        setIsLoadingInitial(false)
       }
     }
+    loadBriefing()
   }, [])
 
   // Generate markdown from the briefing
@@ -195,14 +199,26 @@ export default function AnalysisPage() {
       const data = await res.json()
 
       if (data.success) {
-        // Add timestamp and save to localStorage
+        // Add timestamp
         const summaryWithTimestamp = {
           ...data,
           generatedAt: new Date().toISOString(),
         }
         setSummary(summaryWithTimestamp)
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(summaryWithTimestamp))
-        toast.success("Executive briefing generated")
+
+        // Save to database
+        await fetch("/api/briefings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            period: data.period,
+            analysisCount: data.analysisCount,
+            executiveBriefing: data.executiveBriefing,
+            usage: data.usage,
+          }),
+        })
+
+        toast.success("Executive briefing generated and saved")
       } else {
         toast.error(data.error || "Failed to generate summary")
       }

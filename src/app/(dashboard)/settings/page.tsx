@@ -22,7 +22,18 @@ import {
   Tag,
   RefreshCw,
   Clock,
+  Trash2,
+  AlertTriangle,
+  Loader2,
 } from "lucide-react"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 
 interface UsageStats {
@@ -130,11 +141,106 @@ const settingsLinks = [
   },
 ]
 
+interface PurgeStats {
+  wouldPurge: { transcripts: number; logs: number }
+  totals: { transcripts: number; logs: number }
+  cutoffDate: string
+  retentionDays: number
+}
+
 export default function SettingsPage() {
   const [usage, setUsage] = useState<UsageStats | null>(null)
   const [dbStats, setDbStats] = useState<DatabaseStats | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoadingDb, setIsLoadingDb] = useState(true)
+  const [retentionDays, setRetentionDays] = useState("30")
+  const [purgeStats, setPurgeStats] = useState<PurgeStats | null>(null)
+  const [isLoadingPurge, setIsLoadingPurge] = useState(false)
+  const [isPurging, setIsPurging] = useState(false)
+
+  // Load settings and purge stats
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch("/api/settings")
+      if (res.ok) {
+        const data = await res.json()
+        if (data.settings?.retentionDays) {
+          setRetentionDays(data.settings.retentionDays)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch settings:", error)
+    }
+  }
+
+  const fetchPurgeStats = async (days: string) => {
+    setIsLoadingPurge(true)
+    try {
+      const res = await fetch(`/api/purge?days=${days}`)
+      if (res.ok) {
+        const data = await res.json()
+        setPurgeStats(data)
+      }
+    } catch (error) {
+      console.error("Failed to fetch purge stats:", error)
+    } finally {
+      setIsLoadingPurge(false)
+    }
+  }
+
+  const handleRetentionChange = async (value: string) => {
+    setRetentionDays(value)
+    // Save setting
+    try {
+      await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: "retentionDays", value }),
+      })
+      toast.success("Retention period updated")
+    } catch (error) {
+      console.error("Failed to save setting:", error)
+      toast.error("Failed to save setting")
+    }
+    // Refresh purge stats
+    fetchPurgeStats(value)
+  }
+
+  const handlePurgeNow = async () => {
+    if (!confirm(`This will permanently delete transcripts and logs older than ${retentionDays} days. This action cannot be undone. Continue?`)) {
+      return
+    }
+
+    setIsPurging(true)
+    try {
+      const res = await fetch("/api/purge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ retentionDays: parseInt(retentionDays) }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        toast.success(
+          `Purged ${data.purged.transcripts} transcripts and ${data.purged.logs} logs`
+        )
+        fetchPurgeStats(retentionDays)
+        fetchDbStats() // Refresh database stats
+      } else {
+        toast.error("Failed to purge data")
+      }
+    } catch (error) {
+      console.error("Failed to purge:", error)
+      toast.error("Failed to purge data")
+    } finally {
+      setIsPurging(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSettings()
+    fetchPurgeStats("30")
+  }, [])
 
   useEffect(() => {
     const fetchUsage = async () => {
@@ -508,6 +614,108 @@ export default function SettingsPage() {
           ) : (
             <p className="text-muted-foreground">Unable to load database statistics</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Data Management / Purge */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Trash2 className="h-5 w-5 text-destructive" />
+            Data Management
+          </CardTitle>
+          <CardDescription>
+            Configure data retention and purge old transcripts to save storage
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-6">
+            {/* Retention Period Setting */}
+            <div className="flex items-center justify-between p-4 rounded-lg border">
+              <div>
+                <p className="font-medium">Retention Period</p>
+                <p className="text-sm text-muted-foreground">
+                  Transcripts and logs older than this will be eligible for purging
+                </p>
+              </div>
+              <Select value={retentionDays} onValueChange={handleRetentionChange}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="7">7 days</SelectItem>
+                  <SelectItem value="14">14 days</SelectItem>
+                  <SelectItem value="30">30 days</SelectItem>
+                  <SelectItem value="60">60 days</SelectItem>
+                  <SelectItem value="90">90 days</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Purge Preview */}
+            <div className="p-4 rounded-lg border bg-amber-500/5 border-amber-500/20">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-medium text-amber-500">Data Purge Preview</p>
+                  {isLoadingPurge ? (
+                    <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Calculating...
+                    </div>
+                  ) : purgeStats ? (
+                    <div className="mt-2 space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Items older than {formatDistanceToNow(new Date(purgeStats.cutoffDate))} ago:
+                      </p>
+                      <div className="flex gap-4">
+                        <div className="text-sm">
+                          <span className="font-medium text-foreground">{purgeStats.wouldPurge.transcripts}</span>
+                          <span className="text-muted-foreground"> / {purgeStats.totals.transcripts} transcripts</span>
+                        </div>
+                        <div className="text-sm">
+                          <span className="font-medium text-foreground">{purgeStats.wouldPurge.logs}</span>
+                          <span className="text-muted-foreground"> / {purgeStats.totals.logs} logs</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Note: Analyses are preserved permanently. Only raw transcripts and logs are purged.
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground mt-2">Unable to load purge statistics</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Purge Button */}
+            <div className="flex items-center justify-between pt-2">
+              <div>
+                <p className="font-medium text-destructive">Purge Now</p>
+                <p className="text-sm text-muted-foreground">
+                  Permanently delete old transcripts and logs. This cannot be undone.
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handlePurgeNow}
+                disabled={isPurging || !purgeStats || (purgeStats.wouldPurge.transcripts === 0 && purgeStats.wouldPurge.logs === 0)}
+              >
+                {isPurging ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Purging...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Purge Data
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

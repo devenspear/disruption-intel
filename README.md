@@ -9,6 +9,8 @@ A content intelligence platform for monitoring, transcribing, and analyzing vide
 ### Content Sources
 - **YouTube Channels** - Monitor channels for new videos, auto-fetch transcripts
 - **Podcasts** - RSS feed monitoring with multi-tier transcript acquisition
+- **Twitter/X Accounts** - Monitor influential accounts for tweets and threads
+- **Substack** - Newsletter monitoring and content extraction
 
 ### Transcript Acquisition
 Multi-strategy approach for maximum transcript coverage:
@@ -27,13 +29,24 @@ Dual-provider AI analysis with automatic fallback:
 - Disruption signals detection
 - Customizable analysis prompts
 
+### Executive Briefing
+- AI-generated summary of recent analyses
+- Configurable time period (7, 14, 30, 60, 90 days)
+- Key themes and trends identification
+- Notable quotes and disruption signals
+- Token usage tracking
+- Persisted in database (accessible across browsers)
+
 ### Content Library
-- Full-featured table with columns: Type, Title, Source, Status, Words, Score, Published
-- Responsive design with horizontal scrolling
-- Content type icons (Video/Podcast)
+- Full-featured table with resizable columns
+- Column types: Type, Title, Source, Status, Words, Score, Published
+- Checkbox selection for batch operations
+- Batch actions: Process, Analyze, Archive, Delete
+- Sortable columns with asc/desc ordering
+- Content type icons (Video/Podcast/Article/Tweet)
 - Transcript source badges (YouTube, RSS, Scraped, etc.)
-- Filtering by status, source, and search
-- Pagination support
+- Filtering by status, source type, and search
+- Infinite scroll pagination
 
 ### Dashboard
 - Real-time stats: Total Content, Analyzed, Processing, Pending
@@ -48,6 +61,14 @@ Dual-provider AI analysis with automatic fallback:
 - AI model attribution (shows which model was used)
 - Transcript viewer with word count and source info
 - Direct link to original content
+
+### Settings & Data Management
+- **API Usage Dashboard** - Track token usage and costs by month/model
+- **Database Overview** - Live view of all database tables and record counts
+- **Data Management** - Configure retention period (7-90 days)
+- **Purge Controls** - Preview and execute purge of old transcripts/logs
+- **Analysis Prompts** - Customize AI analysis instructions
+- **System Logs** - View application activity and errors
 
 ## Tech Stack
 
@@ -106,6 +127,9 @@ INNGEST_SIGNING_KEY="..."
 
 # Transcript Service (Railway deployment)
 TRANSCRIPT_SERVICE_URL="https://transcript-service-production.up.railway.app"
+
+# Twitter/X API (TwitterAPI.io)
+TWITTER_API_KEY="your-twitter-api-key"
 ```
 
 ### Database Setup
@@ -204,6 +228,8 @@ src/
 |------|--------|---------------------|
 | `VIDEO` | YouTube Channel | YouTube Auto Captions |
 | `PODCAST_EPISODE` | RSS Feed | RSS → Page Scrape → YouTube Fallback |
+| `SOCIAL_POST` | Twitter/X | Direct text content |
+| `ARTICLE` | Substack/RSS | Article body extraction |
 
 ## AI Analysis Flow
 
@@ -252,6 +278,21 @@ Content →
 ### Settings
 - `GET /api/prompts` - List analysis prompts
 - `GET /api/logs` - View application logs
+- `GET /api/settings` - Get system settings
+- `PUT /api/settings` - Update a system setting
+
+### Executive Briefing
+- `GET /api/briefings` - Get latest executive briefing
+- `POST /api/briefings` - Save new briefing
+- `POST /api/analysis/summary` - Generate AI summary of recent analyses
+
+### Data Management
+- `GET /api/purge?days=30` - Preview what would be purged
+- `POST /api/purge` - Execute purge of old transcripts/logs
+
+### Statistics
+- `GET /api/stats/usage` - API usage and cost statistics
+- `GET /api/stats/database` - Database overview and record counts
 
 ## Deployment
 
@@ -277,6 +318,7 @@ The YouTube transcript service is deployed on Railway:
 - Anthropic API access (Claude)
 - OpenAI API access (fallback)
 - Railway (for transcript service)
+- TwitterAPI.io account (for Twitter/X monitoring)
 
 ## Version
 

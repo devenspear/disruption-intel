@@ -226,3 +226,26 @@ model SystemLog {
   @@index([contentId])
   @@index([createdAt])
 }
+
+// Executive Briefings - stored analysis summaries
+model ExecutiveBriefing {
+  id               String   @id @default(cuid())
+  periodDays       Int      // Number of days covered (7, 14, 30, etc.)
+  periodStartDate  DateTime
+  periodEndDate    DateTime
+  analysisCount    Int      // Number of analyses included
+  briefing         Json     // The full ExecutiveBriefing object
+  inputTokens      Int
+  outputTokens     Int
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// System Settings - configurable app settings
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  updatedAt DateTime @updatedAt
+}
