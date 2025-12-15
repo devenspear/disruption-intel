@@ -36,8 +36,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { toast } from "sonner"
-import { formatDistanceToNow } from "date-fns"
+import { formatDistanceToNow, format } from "date-fns"
 
 interface UsageStats {
   thisMonth: {
@@ -160,6 +169,8 @@ export default function SettingsPage() {
   const [purgeStats, setPurgeStats] = useState<PurgeStats | null>(null)
   const [isLoadingPurge, setIsLoadingPurge] = useState(false)
   const [isPurging, setIsPurging] = useState(false)
+  const [showPurgeDialog, setShowPurgeDialog] = useState(false)
+  const [confirmText, setConfirmText] = useState("")
 
   // Load settings and purge stats
   const fetchSettings = async () => {
@@ -209,10 +220,13 @@ export default function SettingsPage() {
     fetchPurgeStats(value)
   }
 
-  const handlePurgeNow = async () => {
-    if (!confirm(`This will permanently delete transcripts and logs older than ${retentionDays} days. This action cannot be undone. Continue?`)) {
-      return
-    }
+  const openPurgeDialog = () => {
+    setConfirmText("")
+    setShowPurgeDialog(true)
+  }
+
+  const handlePurgeConfirm = async () => {
+    if (confirmText !== "PURGE") return
 
     setIsPurging(true)
     try {
@@ -227,6 +241,8 @@ export default function SettingsPage() {
         toast.success(
           `Purged ${data.purged.transcripts} transcripts and ${data.purged.logs} logs`
         )
+        setShowPurgeDialog(false)
+        setConfirmText("")
         fetchPurgeStats(retentionDays)
         fetchDbStats() // Refresh database stats
       } else {
@@ -742,25 +758,100 @@ export default function SettingsPage() {
               </div>
               <Button
                 variant="destructive"
-                onClick={handlePurgeNow}
+                onClick={openPurgeDialog}
                 disabled={isPurging || !purgeStats || (purgeStats.wouldPurge.transcripts === 0 && purgeStats.wouldPurge.logs === 0)}
               >
-                {isPurging ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Purging...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Purge Data
-                  </>
-                )}
+                <Trash2 className="h-4 w-4 mr-2" />
+                Purge Data
               </Button>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Purge Confirmation Dialog */}
+      <Dialog open={showPurgeDialog} onOpenChange={setShowPurgeDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Confirm Data Purge
+            </DialogTitle>
+            <DialogDescription>
+              This action is permanent and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {purgeStats && (
+              <>
+                <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="font-medium mb-2">You are about to permanently delete:</p>
+                  <ul className="space-y-1 text-sm">
+                    <li className="flex items-center gap-2">
+                      <span className="font-bold text-lg">{purgeStats.wouldPurge.transcripts}</span>
+                      <span className="text-muted-foreground">transcripts (content published before {format(new Date(purgeStats.cutoffDate), "MMM d, yyyy")})</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="font-bold text-lg">{purgeStats.wouldPurge.logs}</span>
+                      <span className="text-muted-foreground">system logs</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <div className="text-sm text-muted-foreground">
+                  <p className="mb-2">What will be preserved:</p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>All AI analyses (permanently kept)</li>
+                    <li>Content records and metadata</li>
+                    <li>Source configurations</li>
+                  </ul>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="confirm-purge" className="text-sm font-medium">
+                    Type <span className="font-mono bg-muted px-1.5 py-0.5 rounded">PURGE</span> to confirm:
+                  </label>
+                  <Input
+                    id="confirm-purge"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value.toUpperCase())}
+                    placeholder="Type PURGE"
+                    className="font-mono"
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowPurgeDialog(false)}
+              disabled={isPurging}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handlePurgeConfirm}
+              disabled={confirmText !== "PURGE" || isPurging}
+            >
+              {isPurging ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Purging...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Confirm Purge
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Settings Links */}
       <div className="grid gap-4 md:grid-cols-2">

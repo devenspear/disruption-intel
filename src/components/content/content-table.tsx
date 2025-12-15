@@ -344,9 +344,12 @@ export function ContentTable({
   }
 
   return (
-    <div className="max-h-[calc(100vh-300px)] overflow-auto">
-      <Table style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 0) }}>
-        <TableHeader className="sticky top-0 z-10 bg-background shadow-sm">
+    <div className="max-h-[calc(100vh-280px)] overflow-auto relative">
+      <table
+        className="w-full caption-bottom text-sm"
+        style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 0) }}
+      >
+        <thead className="sticky top-0 z-10 bg-background shadow-sm [&_tr]:border-b">
           <TableRow className="hover:bg-transparent border-b">
             <TableHead style={{ width: columnWidths.checkbox }} className="relative">
               <Checkbox
@@ -426,8 +429,8 @@ export function ContentTable({
             </TableHead>
             <TableHead style={{ width: columnWidths.actions }}></TableHead>
           </TableRow>
-        </TableHeader>
-        <TableBody>
+        </thead>
+        <tbody className="[&_tr:last-child]:border-0">
           {contents.map((content) => {
             const isSelected = selectedIds.has(content.id)
             return (
@@ -543,8 +546,8 @@ export function ContentTable({
               </TableRow>
             )
           })}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </div>
   )
 }
