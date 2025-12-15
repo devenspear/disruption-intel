@@ -28,6 +28,8 @@ import {
   ExternalLink,
   Info,
   CheckCircle2,
+  Zap,
+  Calendar,
 } from "lucide-react"
 import {
   Select,
@@ -717,6 +719,86 @@ export default function SettingsPage() {
           ) : (
             <p className="text-muted-foreground">Unable to load database statistics</p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Background Jobs (Inngest) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-500" />
+            Background Jobs (Inngest)
+          </CardTitle>
+          <CardDescription>
+            Inngest handles all background processing for content analysis
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {/* What Inngest Does */}
+            <div className="p-4 rounded-lg border bg-amber-500/5 border-amber-500/20">
+              <div className="flex items-start gap-3">
+                <Info className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="space-y-2">
+                  <p className="font-medium text-amber-400">What does Inngest do?</p>
+                  <p className="text-sm text-muted-foreground">
+                    Inngest is the background job system that powers your content processing workflow:
+                  </p>
+                  <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1 mt-2">
+                    <li><strong>Scheduled Source Checks</strong> - Automatically checks your sources daily at midnight for new content</li>
+                    <li><strong>Content Processing</strong> - Fetches transcripts from YouTube, podcasts, and Twitter</li>
+                    <li><strong>AI Analysis</strong> - Runs Claude analysis on transcripts (the slow part that runs in background)</li>
+                    <li><strong>Retry Handling</strong> - Automatically retries failed jobs with exponential backoff</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* Functions Overview */}
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+              <div className="p-3 rounded-lg border bg-card text-center">
+                <Calendar className="h-4 w-4 mx-auto mb-1 text-blue-500" />
+                <p className="text-sm font-medium">scheduled-source-check</p>
+                <p className="text-xs text-muted-foreground">Daily at midnight</p>
+              </div>
+              <div className="p-3 rounded-lg border bg-card text-center">
+                <Radio className="h-4 w-4 mx-auto mb-1 text-green-500" />
+                <p className="text-sm font-medium">check-source</p>
+                <p className="text-xs text-muted-foreground">On-demand</p>
+              </div>
+              <div className="p-3 rounded-lg border bg-card text-center">
+                <FileText className="h-4 w-4 mx-auto mb-1 text-orange-500" />
+                <p className="text-sm font-medium">process-content</p>
+                <p className="text-xs text-muted-foreground">Fetch transcripts</p>
+              </div>
+              <div className="p-3 rounded-lg border bg-card text-center">
+                <Brain className="h-4 w-4 mx-auto mb-1 text-purple-500" />
+                <p className="text-sm font-medium">analyze-content</p>
+                <p className="text-xs text-muted-foreground">AI analysis</p>
+              </div>
+            </div>
+
+            {/* Link to Inngest Dashboard */}
+            <div className="flex items-center justify-between p-4 rounded-lg border">
+              <div>
+                <p className="font-medium">Inngest Dashboard</p>
+                <p className="text-sm text-muted-foreground">
+                  View job runs, errors, and detailed logs in the Inngest cloud dashboard
+                </p>
+              </div>
+              <Button variant="outline" asChild>
+                <a
+                  href="https://app.inngest.com/env/production/apps/disruption-intel"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="gap-2"
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open Dashboard
+                </a>
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
