@@ -79,39 +79,55 @@ export function TranscriptViewer({ segments, fullText, videoId }: TranscriptView
       </div>
 
       <ScrollArea className="flex-1 p-4">
-        <div className="space-y-2">
-          {filteredSegments.map((segment, index) => (
-            <div
-              key={index}
-              className="flex gap-3 p-2 rounded hover:bg-accent/50 group"
-            >
-              <button
-                onClick={() => handleTimestampClick(segment.start)}
-                className="text-xs font-mono text-primary hover:underline whitespace-nowrap"
+        {segments.length > 0 ? (
+          <div className="space-y-2">
+            {filteredSegments.map((segment, index) => (
+              <div
+                key={index}
+                className="flex gap-3 p-2 rounded hover:bg-accent/50 group"
               >
-                {formatTimestamp(segment.start)}
-              </button>
-              <p className="text-sm leading-relaxed">
-                {search ? (
-                  <HighlightText text={segment.text} highlight={search} />
-                ) : (
-                  segment.text
-                )}
-              </p>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="opacity-0 group-hover:opacity-100 h-6 w-6"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(segment.text)
-                  toast.success("Segment copied")
-                }}
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-            </div>
-          ))}
-        </div>
+                <button
+                  onClick={() => handleTimestampClick(segment.start)}
+                  className="text-xs font-mono text-primary hover:underline whitespace-nowrap"
+                >
+                  {formatTimestamp(segment.start)}
+                </button>
+                <p className="text-sm leading-relaxed">
+                  {search ? (
+                    <HighlightText text={segment.text} highlight={search} />
+                  ) : (
+                    segment.text
+                  )}
+                </p>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="opacity-0 group-hover:opacity-100 h-6 w-6"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(segment.text)
+                    toast.success("Segment copied")
+                  }}
+                >
+                  <Copy className="h-3 w-3" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : fullText ? (
+          <div className="p-2">
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+              {search ? (
+                <HighlightText text={fullText} highlight={search} />
+              ) : (
+                fullText
+              )}
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No transcript content available
+          </p>
+        )}
       </ScrollArea>
     </div>
   )
