@@ -7,8 +7,18 @@ import { Prisma } from "@prisma/client"
 
 const updateSourceSchema = z.object({
   name: z.string().min(1).optional(),
-  type: z.enum(["YOUTUBE_CHANNEL", "PODCAST", "RSS", "MANUAL"]).optional(),
-  url: z.string().url().optional(),
+  type: z.enum(["YOUTUBE_CHANNEL", "PODCAST", "RSS", "SUBSTACK", "TWITTER", "MANUAL"]).optional(),
+  url: z.string().min(1).refine((val) => {
+    // Allow search: prefix for Twitter searches
+    if (val.startsWith("search:")) return true
+    // Otherwise validate as URL
+    try {
+      new URL(val)
+      return true
+    } catch {
+      return false
+    }
+  }, { message: "Must be a valid URL or search:query format" }).optional(),
   checkFrequency: z.string().optional(),
   isActive: z.boolean().optional(),
   metadata: z.any().optional(),
