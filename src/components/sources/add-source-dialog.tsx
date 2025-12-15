@@ -38,18 +38,25 @@ export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
   const [type, setType] = useState("YOUTUBE_CHANNEL")
   const [url, setUrl] = useState("")
   const [checkFrequency, setCheckFrequency] = useState("daily")
+  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError(null)
 
     try {
       await onAdd({ name, type, url, checkFrequency })
+      // Only close and reset on success
       setOpen(false)
       setName("")
       setUrl("")
       setType("YOUTUBE_CHANNEL")
       setCheckFrequency("daily")
+      setError(null)
+    } catch (err) {
+      // Keep dialog open and show error
+      setError(err instanceof Error ? err.message : "Failed to add source")
     } finally {
       setIsLoading(false)
     }
@@ -108,7 +115,7 @@ export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
                   type === "PODCAST" ? "https://feeds.example.com/podcast.xml" :
                   type === "RSS" ? "https://blog.example.com/feed" :
                   type === "SUBSTACK" ? "https://newsletter.substack.com/feed" :
-                  type === "TWITTER" ? "@username or search:AI startup" :
+                  type === "TWITTER" ? "https://x.com/username or search:AI startup" :
                   "https://..."
                 }
                 value={url}
@@ -121,9 +128,16 @@ export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
                 </p>
               )}
               {type === "TWITTER" && (
-                <p className="text-xs text-muted-foreground">
-                  Use @username for user tweets or search:query for search results. Requires TWITTER_API_KEY.
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Supported formats:
+                  </p>
+                  <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
+                    <li><code className="bg-muted px-1 rounded">https://x.com/sama</code> - User profile URL</li>
+                    <li><code className="bg-muted px-1 rounded">https://twitter.com/elonmusk</code> - Legacy Twitter URL</li>
+                    <li><code className="bg-muted px-1 rounded">search:AI startup funding</code> - Search query</li>
+                  </ul>
+                </div>
               )}
             </div>
             <div className="grid gap-2">
@@ -139,6 +153,11 @@ export function AddSourceDialog({ onAdd }: AddSourceDialogProps) {
                 </SelectContent>
               </Select>
             </div>
+            {error && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>

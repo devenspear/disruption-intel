@@ -47,6 +47,7 @@ export function EditSourceDialog({ source, open, onOpenChange, onSave }: EditSou
   const [type, setType] = useState("YOUTUBE_CHANNEL")
   const [url, setUrl] = useState("")
   const [checkFrequency, setCheckFrequency] = useState("daily")
+  const [error, setError] = useState<string | null>(null)
 
   // Update form when source changes
   useEffect(() => {
@@ -55,6 +56,7 @@ export function EditSourceDialog({ source, open, onOpenChange, onSave }: EditSou
       setType(source.type)
       setUrl(source.url)
       setCheckFrequency(source.checkFrequency)
+      setError(null)
     }
   }, [source])
 
@@ -63,10 +65,13 @@ export function EditSourceDialog({ source, open, onOpenChange, onSave }: EditSou
     if (!source) return
 
     setIsLoading(true)
+    setError(null)
 
     try {
       await onSave(source.id, { name, type, url, checkFrequency })
       onOpenChange(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save changes")
     } finally {
       setIsLoading(false)
     }
@@ -124,9 +129,16 @@ export function EditSourceDialog({ source, open, onOpenChange, onSave }: EditSou
                 </p>
               )}
               {type === "TWITTER" && (
-                <p className="text-xs text-muted-foreground">
-                  Use @username or search:query format
-                </p>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">
+                    Supported formats:
+                  </p>
+                  <ul className="text-xs text-muted-foreground list-disc list-inside space-y-0.5">
+                    <li><code className="bg-muted px-1 rounded">https://x.com/sama</code> - User profile URL</li>
+                    <li><code className="bg-muted px-1 rounded">https://twitter.com/elonmusk</code> - Legacy Twitter URL</li>
+                    <li><code className="bg-muted px-1 rounded">search:AI startup funding</code> - Search query</li>
+                  </ul>
+                </div>
               )}
             </div>
             <div className="grid gap-2">
@@ -142,6 +154,11 @@ export function EditSourceDialog({ source, open, onOpenChange, onSave }: EditSou
                 </SelectContent>
               </Select>
             </div>
+            {error && (
+              <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

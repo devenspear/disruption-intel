@@ -269,6 +269,8 @@ export async function getUserProfile(userName: string): Promise<TwitterUser | nu
 /**
  * Parse a Twitter source URL to determine the type and target
  * Supports:
+ * - https://x.com/username - fetch user tweets
+ * - https://twitter.com/username - fetch user tweets
  * - @username - fetch user tweets
  * - search:query - search tweets
  * - from:username - get tweets from specific user
@@ -278,6 +280,18 @@ export function parseTwitterSource(sourceUrl: string): {
   target: string
 } {
   const trimmed = sourceUrl.trim()
+
+  // Full X.com URL: https://x.com/username or https://x.com/username/...
+  const xUrlMatch = trimmed.match(/^https?:\/\/(?:www\.)?x\.com\/([^\/\?]+)/)
+  if (xUrlMatch) {
+    return { type: 'user', target: xUrlMatch[1] }
+  }
+
+  // Full Twitter.com URL: https://twitter.com/username
+  const twitterUrlMatch = trimmed.match(/^https?:\/\/(?:www\.)?twitter\.com\/([^\/\?]+)/)
+  if (twitterUrlMatch) {
+    return { type: 'user', target: twitterUrlMatch[1] }
+  }
 
   // @username format
   if (trimmed.startsWith('@')) {

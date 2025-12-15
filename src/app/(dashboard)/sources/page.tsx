@@ -5,6 +5,8 @@ import { SourceCard } from "@/components/sources/source-card"
 import { AddSourceDialog } from "@/components/sources/add-source-dialog"
 import { EditSourceDialog } from "@/components/sources/edit-source-dialog"
 import { Skeleton } from "@/components/ui/skeleton"
+import { Button } from "@/components/ui/button"
+import { ArrowUpDown } from "lucide-react"
 import { toast } from "sonner"
 
 interface Source {
@@ -26,6 +28,7 @@ export default function SourcesPage() {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [editingSource, setEditingSource] = useState<Source | null>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [sortByType, setSortByType] = useState(false)
 
   const fetchSources = async () => {
     try {
@@ -63,7 +66,9 @@ export default function SourcesPage() {
       fetchSources()
     } else {
       const data = await res.json()
-      toast.error(data.error || "Failed to add source")
+      const errorMessage = data.error || "Failed to add source"
+      toast.error(errorMessage)
+      throw new Error(errorMessage)
     }
   }
 
@@ -153,9 +158,20 @@ export default function SourcesPage() {
       fetchSources()
     } else {
       const errorData = await res.json()
-      toast.error(errorData.error || "Failed to update source")
+      const errorMessage = errorData.error || "Failed to update source"
+      toast.error(errorMessage)
+      throw new Error(errorMessage)
     }
   }
+
+  // Sort sources by type if enabled, then by name
+  const sortedSources = sortByType
+    ? [...sources].sort((a, b) => {
+        const typeCompare = a.type.localeCompare(b.type)
+        if (typeCompare !== 0) return typeCompare
+        return a.name.localeCompare(b.name)
+      })
+    : sources
 
   return (
     <div className="space-y-6">
@@ -166,7 +182,17 @@ export default function SourcesPage() {
             Manage your content sources for monitoring
           </p>
         </div>
-        <AddSourceDialog onAdd={handleAddSource} />
+        <div className="flex items-center gap-2">
+          <Button
+            variant={sortByType ? "secondary" : "outline"}
+            size="sm"
+            onClick={() => setSortByType(!sortByType)}
+          >
+            <ArrowUpDown className="mr-2 h-4 w-4" />
+            {sortByType ? "Sorted by Type" : "Sort by Type"}
+          </Button>
+          <AddSourceDialog onAdd={handleAddSource} />
+        </div>
       </div>
 
       {isLoading ? (
@@ -182,7 +208,7 @@ export default function SourcesPage() {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sources.map((source) => (
+          {sortedSources.map((source) => (
             <SourceCard
               key={source.id}
               source={source}

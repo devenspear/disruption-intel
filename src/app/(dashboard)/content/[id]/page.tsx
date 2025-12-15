@@ -318,10 +318,10 @@ export default function ContentDetailPage({
           <div className="flex items-center justify-between gap-4">
             {/* Left: Back + Title */}
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <Button variant="ghost" size="sm" asChild className="shrink-0 -ml-2">
-                <Link href="/content" className="flex items-center gap-1">
+              <Button variant="outline" size="sm" asChild className="shrink-0">
+                <Link href="/content" className="flex items-center gap-1.5">
                   <ChevronLeft className="h-4 w-4" />
-                  <span className="hidden sm:inline">Content</span>
+                  <span>Content</span>
                 </Link>
               </Button>
               <div className="min-w-0 flex-1">
@@ -337,7 +337,12 @@ export default function ContentDetailPage({
                     </span>
                   )}
                   <Badge variant="outline" className="text-xs px-1.5 py-0">{content.source.name}</Badge>
-                  <Badge className={`${statusColors[content.status]} text-xs px-1.5 py-0`}>{content.status}</Badge>
+                  <Badge className={`${statusColors[content.status]} text-xs px-1.5 py-0`}>
+                      {content.status}
+                    </Badge>
+                    {content.status === "FAILED" && (
+                      <span className="text-red-400 text-xs">(See details below)</span>
+                    )}
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {format(new Date(content.publishedAt), "MMM d, yyyy")}
@@ -399,6 +404,57 @@ export default function ContentDetailPage({
           )}
         </div>
       </div>
+
+      {/* Failure Explanation Banner */}
+      {content.status === "FAILED" && (
+        <div className="mx-4 mt-4 p-4 bg-red-950/30 border border-red-800/50 rounded-lg">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-red-400 mt-0.5 shrink-0" />
+            <div className="space-y-2">
+              <h3 className="font-medium text-red-300">Content Processing Failed</h3>
+              <p className="text-sm text-red-300/80">
+                This content could not be processed. Common reasons include:
+              </p>
+              <ul className="text-sm text-red-300/70 list-disc list-inside space-y-1">
+                <li>Transcript not available or could not be fetched</li>
+                <li>Source URL is invalid or has changed</li>
+                <li>Content is private, age-restricted, or region-locked</li>
+                <li>Rate limiting from the source platform</li>
+                <li>Network or API timeout during processing</li>
+              </ul>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-red-700 text-red-300 hover:bg-red-900/50"
+                  onClick={handleFetchTranscript}
+                  disabled={isFetchingTranscript}
+                >
+                  {isFetchingTranscript ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
+                      Retrying...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-1.5" />
+                      Retry Transcript Fetch
+                    </>
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-300 hover:bg-red-900/50"
+                  asChild
+                >
+                  <Link href="/settings/logs">View System Logs</Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content - 1/3 + 2/3 Layout */}
       <div className="flex flex-col lg:flex-row gap-4 p-4">

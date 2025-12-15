@@ -45,22 +45,22 @@ const sourceTypeLabels: Record<string, string> = {
 }
 
 const sourceTypeColors: Record<string, string> = {
-  YOUTUBE_CHANNEL: "bg-red-500",
-  PODCAST: "bg-purple-500",
-  RSS: "bg-orange-500",
-  SUBSTACK: "bg-orange-600",
-  TWITTER: "bg-sky-500",
-  MANUAL: "bg-blue-500",
+  YOUTUBE_CHANNEL: "bg-red-600 text-white hover:bg-red-700",
+  PODCAST: "bg-purple-600 text-white hover:bg-purple-700",
+  RSS: "bg-amber-500 text-black hover:bg-amber-600",
+  SUBSTACK: "bg-orange-500 text-white hover:bg-orange-600",
+  TWITTER: "bg-sky-500 text-white hover:bg-sky-600",
+  MANUAL: "bg-slate-600 text-white hover:bg-slate-700",
 }
 
 export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProcess, onEdit, isProcessing }: SourceCardProps) {
   return (
-    <Card className="relative">
-      <CardHeader className="pb-2">
+    <Card className="relative aspect-square flex flex-col">
+      <CardHeader className="pb-3 flex-shrink-0">
         <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <CardTitle className="text-lg">{source.name}</CardTitle>
-            <CardDescription className="flex items-center gap-2">
+          <div className="space-y-2 flex-1 min-w-0">
+            <CardTitle className="text-lg leading-tight line-clamp-2">{source.name}</CardTitle>
+            <CardDescription className="flex items-center gap-2 flex-wrap">
               <Badge variant="secondary" className={sourceTypeColors[source.type]}>
                 {sourceTypeLabels[source.type] || source.type}
               </Badge>
@@ -73,7 +73,7 @@ export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProces
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="flex-shrink-0">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -116,10 +116,10 @@ export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProces
           </DropdownMenu>
         </div>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="flex flex-col flex-1 justify-end space-y-3">
         <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>{source._count.contents} items</span>
-          <span>
+          <span className="font-medium">{source._count.contents} items</span>
+          <span className="text-xs">
             {source.lastChecked
               ? `Last checked ${formatDistanceToNow(new Date(source.lastChecked))} ago`
               : "Never checked"}
@@ -127,7 +127,6 @@ export function SourceCard({ source, onToggleActive, onDelete, onCheck, onProces
         </div>
         <Button
           className="w-full"
-          size="sm"
           onClick={() => onProcess(source.id)}
           disabled={isProcessing}
         >

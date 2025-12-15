@@ -12,6 +12,7 @@ import {
   MessageSquare,
   LogOut,
   Brain,
+  Zap,
 } from "lucide-react"
 import { signOut } from "next-auth/react"
 import { Button } from "@/components/ui/button"
@@ -26,20 +27,36 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ]
 
+// Logo component with custom design
+function Logo() {
+  return (
+    <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 flex items-center justify-center shadow-lg shadow-purple-500/25">
+      <Zap className="h-5 w-5 text-white" strokeWidth={2.5} />
+      <div className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-emerald-400 border-2 border-card" />
+    </div>
+  )
+}
+
 export function Sidebar() {
   const pathname = usePathname()
 
   return (
     <div className="flex h-full w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center border-b px-6">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">DI</span>
+      {/* Enhanced Header */}
+      <div className="flex h-20 items-center border-b px-6">
+        <Link href="/" className="flex items-center gap-3 group">
+          <Logo />
+          <div className="flex flex-col">
+            <span className="font-bold text-lg tracking-tight group-hover:text-primary transition-colors">
+              Disruption Intel
+            </span>
+            <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
+              AI-Powered Insights
+            </span>
           </div>
-          <span className="font-semibold">Disruption Intel</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 p-4">
+      <nav className="flex-1 space-y-1.5 p-4">
         {navigation.map((item) => {
           const isActive = pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href))
@@ -48,13 +65,13 @@ export function Sidebar() {
               key={item.name}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-all",
                 isActive
-                  ? "bg-primary text-primary-foreground"
+                  ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
             >
-              <item.icon className="h-4 w-4" />
+              <item.icon className="h-5 w-5" />
               {item.name}
             </Link>
           )
@@ -63,10 +80,10 @@ export function Sidebar() {
       <div className="border-t p-4">
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-muted-foreground"
+          className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
           onClick={() => signOut()}
         >
-          <LogOut className="h-4 w-4" />
+          <LogOut className="h-5 w-5" />
           Sign Out
         </Button>
       </div>
