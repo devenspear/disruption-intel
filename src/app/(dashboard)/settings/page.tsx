@@ -171,6 +171,8 @@ export default function SettingsPage() {
   const [isPurging, setIsPurging] = useState(false)
   const [showPurgeDialog, setShowPurgeDialog] = useState(false)
   const [confirmText, setConfirmText] = useState("")
+  const [stuckCount, setStuckCount] = useState<{ stuckInProcessing: number; pending: number } | null>(null)
+  const [isRetrying, setIsRetrying] = useState(false)
 
   // Load settings and purge stats
   const fetchSettings = async () => {
@@ -256,9 +258,45 @@ export default function SettingsPage() {
     }
   }
 
+  const fetchStuckCount = async () => {
+    try {
+      const res = await fetch("/api/content/retry-stuck")
+      if (res.ok) {
+        const data = await res.json()
+        setStuckCount(data)
+      }
+    } catch (error) {
+      console.error("Failed to fetch stuck count:", error)
+    }
+  }
+
+  const handleRetryStuck = async () => {
+    setIsRetrying(true)
+    try {
+      const res = await fetch("/api/content/retry-stuck", {
+        method: "POST",
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        toast.success(`Retrying analysis for ${data.retriedCount} items`)
+        fetchStuckCount() // Refresh count
+        fetchDbStats() // Refresh database stats
+      } else {
+        toast.error("Failed to retry stuck items")
+      }
+    } catch (error) {
+      console.error("Failed to retry:", error)
+      toast.error("Failed to retry stuck items")
+    } finally {
+      setIsRetrying(false)
+    }
+  }
+
   useEffect(() => {
     fetchSettings()
     fetchPurgeStats("30")
+    fetchStuckCount()
   }, [])
 
   useEffect(() => {
@@ -689,6 +727,37 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
+            {/* Retry Stuck Items */}
+            {stuckCount && stuckCount.stuckInProcessing > 0 && (
+              <div className="flex items-center justify-between p-4 rounded-lg border bg-blue-500/5 border-blue-500/20">
+                <div>
+                  <p className="font-medium text-blue-400">Stuck Processing Items</p>
+                  <p className="text-sm text-muted-foreground">
+                    {stuckCount.stuckInProcessing} items are stuck in &quot;Processing&quot; status.
+                    Click retry to re-trigger AI analysis.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleRetryStuck}
+                  disabled={isRetrying}
+                  className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                >
+                  {isRetrying ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Retrying...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Retry Analysis
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+
             {/* Retention Period Setting */}
             <div className="flex items-center justify-between p-4 rounded-lg border">
               <div>
