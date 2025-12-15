@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db"
 import { authOptions } from "@/lib/auth"
 
 // POST - Purge old transcripts (keeps analyses)
+// Purges based on content's publishedAt date, not transcript's createdAt
 export async function POST(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) {
@@ -18,11 +19,14 @@ export async function POST(request: Request) {
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
 
-    // Count records before purge
-    const transcriptCount = await prisma.transcript.count({
+    // Find transcripts for content published before cutoff date
+    const transcriptsToDelete = await prisma.transcript.findMany({
       where: {
-        createdAt: { lt: cutoffDate },
+        content: {
+          publishedAt: { lt: cutoffDate },
+        },
       },
+      select: { id: true },
     })
 
     const logCount = await prisma.systemLog.count({
@@ -31,14 +35,16 @@ export async function POST(request: Request) {
       },
     })
 
-    // Delete old transcripts (but keep analyses)
+    // Delete transcripts for old content (based on content's publishedAt)
     const deletedTranscripts = await prisma.transcript.deleteMany({
       where: {
-        createdAt: { lt: cutoffDate },
+        content: {
+          publishedAt: { lt: cutoffDate },
+        },
       },
     })
 
-    // Delete old system logs
+    // Delete old system logs (still use createdAt for logs)
     const deletedLogs = await prisma.systemLog.deleteMany({
       where: {
         createdAt: { lt: cutoffDate },
@@ -76,6 +82,7 @@ export async function POST(request: Request) {
 }
 
 // GET - Get purge statistics (what would be deleted)
+// Shows counts based on content's publishedAt date
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session) {
@@ -90,13 +97,16 @@ export async function GET(request: Request) {
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - retentionDays)
 
-    // Count records that would be deleted
+    // Count transcripts for content published before cutoff date
     const transcriptCount = await prisma.transcript.count({
       where: {
-        createdAt: { lt: cutoffDate },
+        content: {
+          publishedAt: { lt: cutoffDate },
+        },
       },
     })
 
+    // Count logs older than cutoff (still use createdAt for logs)
     const logCount = await prisma.systemLog.count({
       where: {
         createdAt: { lt: cutoffDate },

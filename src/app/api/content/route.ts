@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/db"
 import { authOptions } from "@/lib/auth"
+import { Prisma } from "@prisma/client"
 
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
   const sourceType = searchParams.get("sourceType")
   const search = searchParams.get("search")
   const sortBy = searchParams.get("sortBy") || "publishedAt"
-  const sortOrder = searchParams.get("sortOrder") || "desc"
+  const sortOrderParam = searchParams.get("sortOrder") || "desc"
+  // Ensure sortOrder is a valid Prisma sort order
+  const sortOrder: Prisma.SortOrder = sortOrderParam === "asc" ? "asc" : "desc"
   const page = parseInt(searchParams.get("page") || "1")
   const limit = parseInt(searchParams.get("limit") || "20")
 
@@ -41,8 +44,7 @@ export async function GET(request: Request) {
   }
 
   // Build orderBy clause based on sortBy field
-  type OrderByType = Record<string, unknown>
-  let orderBy: OrderByType | OrderByType[]
+  let orderBy: Prisma.ContentOrderByWithRelationInput | Prisma.ContentOrderByWithRelationInput[]
 
   switch (sortBy) {
     case "sourceName":
@@ -57,8 +59,20 @@ export async function GET(request: Request) {
       // So we'll fetch and sort in memory for this case
       orderBy = { publishedAt: "desc" } // fallback, will sort in memory
       break
+    case "publishedAt":
+      orderBy = { publishedAt: sortOrder }
+      break
+    case "title":
+      orderBy = { title: sortOrder }
+      break
+    case "status":
+      orderBy = { status: sortOrder }
+      break
+    case "createdAt":
+      orderBy = { createdAt: sortOrder }
+      break
     default:
-      orderBy = { [sortBy]: sortOrder }
+      orderBy = { publishedAt: sortOrder }
   }
 
   const [contents, total] = await Promise.all([

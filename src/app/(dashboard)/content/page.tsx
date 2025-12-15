@@ -371,136 +371,140 @@ function ContentPageContent() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 pt-0 border-b">
-        <div className="flex items-center justify-between py-4">
-          <div>
-            <h1 className="text-3xl font-bold">Content Library</h1>
-            <p className="text-muted-foreground">
-              {total > 0 ? `${total.toLocaleString()} items` : "Browse and manage all ingested content"}
-            </p>
+    <div className="flex flex-col h-full -my-8">
+      {/* Fixed Header Section */}
+      <div className="flex-shrink-0 bg-background pt-8 pb-4 border-b">
+        <div className="container">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold">Content Library</h1>
+              <p className="text-muted-foreground">
+                {total > 0 ? `${total.toLocaleString()} items` : "Browse and manage all ingested content"}
+              </p>
+            </div>
           </div>
-        </div>
 
           <ContentFilters
-          sources={sources}
-          filters={filters}
-          onFilterChange={handleFilterChange}
-          onReset={handleReset}
-        />
+            sources={sources}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            onReset={handleReset}
+          />
+        </div>
       </div>
 
-      {/* Scrollable Content Area */}
-      <div className="flex-1 space-y-6 pt-4">
-        {/* Batch Action Bar */}
+      {/* Batch Action Bar - fixed when visible */}
       {selectedIds.size > 0 && (
-        <div className="sticky top-0 z-10 flex items-center gap-3 p-3 bg-primary/10 border border-primary/20 rounded-lg">
-          <span className="text-sm font-medium">
-            {selectedIds.size} selected
-          </span>
-          <div className="flex-1" />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleBatchProcess}
-            disabled={isBatchProcessing}
-          >
-            {isBatchProcessing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            Process Selected
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleBatchAnalyze}
-            disabled={isBatchProcessing}
-          >
-            {isBatchProcessing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Sparkles className="h-4 w-4 mr-2" />
-            )}
-            Analyze Selected
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleBatchArchive}
-            disabled={isBatchProcessing}
-          >
-            <Archive className="h-4 w-4 mr-2" />
-            Archive
-          </Button>
-          <Button
-            size="sm"
-            variant="destructive"
-            onClick={handleBatchDelete}
-            disabled={isBatchProcessing}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={clearSelection}
-          >
-            <X className="h-4 w-4" />
-          </Button>
+        <div className="flex-shrink-0 bg-primary/10 border-b border-primary/20 py-3">
+          <div className="container flex items-center gap-3">
+            <span className="text-sm font-medium">
+              {selectedIds.size} selected
+            </span>
+            <div className="flex-1" />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBatchProcess}
+              disabled={isBatchProcessing}
+            >
+              {isBatchProcessing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              Process Selected
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBatchAnalyze}
+              disabled={isBatchProcessing}
+            >
+              {isBatchProcessing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4 mr-2" />
+              )}
+              Analyze Selected
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleBatchArchive}
+              disabled={isBatchProcessing}
+            >
+              <Archive className="h-4 w-4 mr-2" />
+              Archive
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={handleBatchDelete}
+              disabled={isBatchProcessing}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={clearSelection}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
-      {isLoading ? (
-        <div className="space-y-4">
-          {[...Array(8)].map((_, i) => (
-            <Skeleton key={i} className="h-14" />
-          ))}
-        </div>
-      ) : contents.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <p className="text-muted-foreground mb-4">No content found</p>
-          <p className="text-sm text-muted-foreground">
-            {filters.search || filters.status !== "all" || filters.sourceId !== "all"
-              ? "Try adjusting your filters"
-              : "Add sources to start ingesting content"}
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="rounded-md border overflow-hidden">
-            <ContentTable
-              contents={contents}
-              onAnalyze={handleAnalyze}
-              onArchive={handleArchive}
-              onDelete={handleDelete}
-              sortBy={filters.sortBy}
-              sortOrder={filters.sortOrder}
-              onSort={handleSort}
-              selectedIds={selectedIds}
-              onSelectionChange={setSelectedIds}
-            />
+      {/* Scrollable Table Area */}
+      <div className="flex-1 overflow-auto min-h-0">
+        {isLoading ? (
+          <div className="container py-4 space-y-4">
+            {[...Array(8)].map((_, i) => (
+              <Skeleton key={i} className="h-14" />
+            ))}
           </div>
+        ) : contents.length === 0 ? (
+          <div className="container flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-muted-foreground mb-4">No content found</p>
+            <p className="text-sm text-muted-foreground">
+              {filters.search || filters.status !== "all" || filters.sourceId !== "all"
+                ? "Try adjusting your filters"
+                : "Add sources to start ingesting content"}
+            </p>
+          </div>
+        ) : (
+          <div className="container py-4">
+            <div className="rounded-md border overflow-hidden">
+              <ContentTable
+                contents={contents}
+                onAnalyze={handleAnalyze}
+                onArchive={handleArchive}
+                onDelete={handleDelete}
+                sortBy={filters.sortBy}
+                sortOrder={filters.sortOrder}
+                onSort={handleSort}
+                selectedIds={selectedIds}
+                onSelectionChange={setSelectedIds}
+              />
+            </div>
 
-          {/* Infinite scroll trigger */}
-          <div ref={loadMoreRef} className="flex justify-center py-4">
-            {isLoadingMore && (
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="text-sm">Loading more...</span>
-              </div>
-            )}
-            {!hasMore && contents.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Showing all {total.toLocaleString()} items
-              </p>
-            )}
+            {/* Infinite scroll trigger */}
+            <div ref={loadMoreRef} className="flex justify-center py-4">
+              {isLoadingMore && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm">Loading more...</span>
+                </div>
+              )}
+              {!hasMore && contents.length > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  Showing all {total.toLocaleString()} items
+                </p>
+              )}
+            </div>
           </div>
-        </>
-      )}
+        )}
       </div>
     </div>
   )

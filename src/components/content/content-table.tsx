@@ -346,8 +346,8 @@ export function ContentTable({
   return (
     <div className="overflow-x-auto">
       <Table style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 0) }}>
-        <TableHeader>
-          <TableRow className="hover:bg-transparent">
+        <TableHeader className="sticky top-0 z-10 bg-background">
+          <TableRow className="hover:bg-transparent border-b">
             <TableHead style={{ width: columnWidths.checkbox }} className="relative">
               <Checkbox
                 checked={allSelected}
