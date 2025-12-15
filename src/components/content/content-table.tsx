@@ -42,6 +42,8 @@ import {
 // Content type icon component with modern styling
 function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: string }) {
   const isPodcast = type === "PODCAST_EPISODE" || sourceType === "PODCAST"
+  const isArticle = type === "ARTICLE" || sourceType === "RSS"
+
   if (isPodcast) {
     return (
       <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-purple-600/20 border border-purple-500/30">
@@ -49,6 +51,16 @@ function ContentTypeIcon({ type, sourceType }: { type?: string; sourceType: stri
       </div>
     )
   }
+
+  if (isArticle) {
+    return (
+      <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500/20 to-orange-600/20 border border-orange-500/30">
+        <FileText className="h-4 w-4 text-orange-400" />
+      </div>
+    )
+  }
+
+  // YouTube/Video
   return (
     <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-red-500/20 to-red-600/20 border border-red-500/30">
       <PlayCircle className="h-4 w-4 text-red-400" />

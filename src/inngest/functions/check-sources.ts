@@ -2,6 +2,7 @@ import { inngest } from "../client"
 import { prisma } from "@/lib/db"
 import { fetchTranscript } from "@/lib/ingestion/transcript"
 import { getLatestEpisodes, type PodcastEpisode } from "@/lib/ingestion/podcast"
+import { getLatestArticles, type RSSArticle } from "@/lib/ingestion/rss-article"
 import { acquireTranscript } from "@/lib/ingestion/transcript-strategies"
 import { logger } from "@/lib/logger"
 
@@ -182,6 +183,90 @@ export const checkSource = inngest.createFunction(
       return { newEpisodes, totalFetched: episodes.length }
     }
 
+    // For RSS feeds (Substack, blogs, newsletters), fetch recent articles
+    if (source.type === "RSS") {
+      logger.info("inngest", "check-source.rss.start", `Checking RSS source: ${source.name}`, {
+        metadata: { sourceId: source.id, feedUrl: source.url },
+      })
+
+      const articles = await step.run("fetch-rss-articles", async () => {
+        try {
+          return await getLatestArticles(source.url, 20)
+        } catch (error) {
+          logger.error("inngest", "check-source.rss.fetch-error", `Failed to fetch articles: ${error}`, {
+            metadata: { sourceId: source.id, error: String(error) },
+          })
+          return []
+        }
+      })
+
+      let newArticles = 0
+
+      for (const article of articles) {
+        // Check if content already exists
+        const existing = await step.run(`check-existing-${article.guid.slice(0, 20)}`, async () => {
+          return prisma.content.findFirst({
+            where: {
+              sourceId: source.id,
+              externalId: article.guid,
+            },
+          })
+        })
+
+        if (!existing) {
+          // Create new content entry for article
+          const content = await step.run(`create-content-${article.guid.slice(0, 20)}`, async () => {
+            return prisma.content.create({
+              data: {
+                sourceId: source.id,
+                externalId: article.guid,
+                title: article.title,
+                description: article.description,
+                publishedAt: article.publishedAt,
+                thumbnailUrl: article.imageUrl,
+                originalUrl: article.articleUrl,
+                contentType: "ARTICLE",
+                metadata: {
+                  author: article.author,
+                  wordCount: article.wordCount,
+                  // Store content for transcript creation
+                  articleContent: article.content,
+                },
+                status: "PENDING",
+              },
+            })
+          })
+
+          logger.info("inngest", "check-source.rss.new-article", `Created content for article: ${article.title}`, {
+            contentId: content.id,
+            metadata: { articleGuid: article.guid, wordCount: article.wordCount },
+          })
+
+          // Trigger processing (will create transcript from article content)
+          await step.sendEvent(`process-${article.guid.slice(0, 20)}`, {
+            name: "content/process",
+            data: { contentId: content.id },
+          })
+
+          newArticles++
+        }
+      }
+
+      // Update last checked time
+      await step.run("update-source", async () => {
+        return prisma.source.update({
+          where: { id: sourceId },
+          data: { lastChecked: new Date() },
+        })
+      })
+
+      logger.info("inngest", "check-source.rss.complete", `RSS check complete: ${newArticles} new articles`, {
+        metadata: { sourceId: source.id, newArticles, totalFetched: articles.length },
+      })
+
+      return { newArticles, totalFetched: articles.length }
+    }
+
     return { processed: false, reason: "Unsupported source type" }
   }
 )
@@ -214,6 +299,67 @@ export const processContent = inngest.createFunction(
 
     // Determine content type and fetch transcript accordingly
     const isPodcast = content.contentType === "PODCAST_EPISODE" || content.source.type === "PODCAST"
+    const isArticle = content.contentType === "ARTICLE" || content.source.type === "RSS"
+
+    // For articles, the content itself serves as the "transcript"
+    if (isArticle) {
+      logger.info("inngest", "process-content.article.start", `Processing article: ${content.title}`, {
+        contentId: content.id,
+      })
+
+      const metadata = content.metadata as {
+        articleContent?: string
+        wordCount?: number
+        author?: string
+      } | null
+
+      if (metadata?.articleContent) {
+        // Save article content as transcript
+        await step.run("save-article-transcript", async () => {
+          return prisma.transcript.create({
+            data: {
+              contentId: content.id,
+              fullText: metadata.articleContent!,
+              segments: [], // Articles don't have time-based segments
+              language: "en",
+              source: "article_content",
+              wordCount: metadata.wordCount || metadata.articleContent!.split(/\s+/).length,
+            },
+          })
+        })
+
+        // Trigger AI analysis
+        await step.sendEvent("trigger-analysis", {
+          name: "content/analyze",
+          data: { contentId: content.id },
+        })
+
+        logger.info("inngest", "process-content.article.success", `Article content saved as transcript`, {
+          contentId: content.id,
+          metadata: { wordCount: metadata.wordCount },
+        })
+
+        return {
+          transcriptFetched: true,
+          source: "article_content",
+          wordCount: metadata.wordCount,
+        }
+      } else {
+        // No article content available
+        await step.run("update-status-failed", async () => {
+          return prisma.content.update({
+            where: { id: contentId },
+            data: { status: "FAILED" },
+          })
+        })
+
+        logger.error("inngest", "process-content.article.no-content", `No article content available`, {
+          contentId: content.id,
+        })
+
+        return { transcriptFetched: false, reason: "No article content" }
+      }
+    }
 
     if (isPodcast) {
       // Use podcast transcript acquisition strategy chain
