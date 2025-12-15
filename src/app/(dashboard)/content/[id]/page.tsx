@@ -22,8 +22,10 @@ import {
   CheckCircle2,
   Loader2,
   ChevronLeft,
-  Video,
-  Mic,
+  PlayCircle,
+  Headphones,
+  Twitter,
+  Rss,
 } from "lucide-react"
 import { formatDistanceToNow, format } from "date-fns"
 import { toast } from "sonner"
@@ -310,96 +312,114 @@ export default function ContentDetailPage({
     ARCHIVED: "bg-gray-500/80",
   }
 
-  return (
-    <div className="min-h-screen">
-      {/* Compact Header */}
-      <div className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            {/* Left: Back + Title */}
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <Button variant="outline" size="sm" asChild className="shrink-0">
-                <Link href="/content" className="flex items-center gap-1.5">
-                  <ChevronLeft className="h-4 w-4" />
-                  <span>Content</span>
-                </Link>
-              </Button>
-              <div className="min-w-0 flex-1">
-                <h1 className="text-lg font-semibold truncate leading-tight">{content.title}</h1>
-                <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                  {(content.contentType === "PODCAST_EPISODE" || content.source.type === "PODCAST") ? (
-                    <span title="Podcast Episode" className="flex items-center gap-1">
-                      <Mic className="h-3 w-3 text-purple-500" />
-                    </span>
-                  ) : (
-                    <span title="Video" className="flex items-center gap-1">
-                      <Video className="h-3 w-3 text-red-500" />
-                    </span>
-                  )}
-                  <Badge variant="outline" className="text-xs px-1.5 py-0">{content.source.name}</Badge>
-                  <Badge className={`${statusColors[content.status]} text-xs px-1.5 py-0`}>
-                      {content.status}
-                    </Badge>
-                    {content.status === "FAILED" && (
-                      <span className="text-red-400 text-xs">(See details below)</span>
-                    )}
-                  <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {format(new Date(content.publishedAt), "MMM d, yyyy")}
-                  </span>
-                  {content.transcript && (
-                    <span className="flex items-center gap-1">
-                      <FileText className="h-3 w-3" />
-                      {content.transcript.wordCount.toLocaleString()} words
-                      {content.transcript.source && (
-                        <span className={`ml-1 text-xs px-1.5 py-0.5 rounded ${getTranscriptSourceColor(content.transcript.source)}`}>
-                          {getTranscriptSourceLabel(content.transcript.source)}
-                        </span>
-                      )}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+  // Get content type icon
+  const getContentTypeIcon = () => {
+    const sourceType = content.source.type
+    if (sourceType === "PODCAST") {
+      return <Headphones className="h-5 w-5 text-purple-400" />
+    } else if (sourceType === "TWITTER") {
+      return <Twitter className="h-5 w-5 text-sky-400" />
+    } else if (sourceType === "RSS" || sourceType === "SUBSTACK") {
+      return <Rss className="h-5 w-5 text-orange-400" />
+    }
+    return <PlayCircle className="h-5 w-5 text-red-400" />
+  }
 
-            {/* Right: Actions */}
-            <div className="flex items-center gap-2 shrink-0">
-              <Button variant="outline" size="sm" asChild>
-                <a href={content.originalUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4 sm:mr-1.5" />
-                  <span className="hidden sm:inline">Original</span>
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header Section */}
+      <div className="border-b bg-card">
+        <div className="px-6 py-5">
+          {/* Top Row: Back Button + Actions */}
+          <div className="flex items-center justify-between mb-4">
+            <Button variant="secondary" size="default" asChild className="gap-2 shadow-sm">
+              <Link href="/content">
+                <ChevronLeft className="h-4 w-4" />
+                Content Library
+              </Link>
+            </Button>
+            <div className="flex items-center gap-3">
+              <Button variant="outline" size="default" asChild>
+                <a href={content.originalUrl} target="_blank" rel="noopener noreferrer" className="gap-2">
+                  <ExternalLink className="h-4 w-4" />
+                  View Original
                 </a>
               </Button>
               <Button
-                size="sm"
+                size="default"
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || !content.transcript}
-                className="min-w-[100px]"
+                className="gap-2 min-w-[140px]"
               >
                 {isAnalyzing ? (
                   <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
-                    <span className="hidden sm:inline">Analyzing</span>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Analyzing...
                   </>
                 ) : (
                   <>
-                    <Brain className="h-4 w-4 sm:mr-1.5" />
-                    <span className="hidden sm:inline">Analyze</span>
+                    <Brain className="h-4 w-4" />
+                    Run Analysis
                   </>
                 )}
               </Button>
             </div>
           </div>
 
-          {/* Tags row */}
-          {content.tags.length > 0 && (
-            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/40">
-              <Tag className="h-3 w-3 text-muted-foreground" />
-              {content.tags.map((tag) => (
-                <Badge key={tag.id} variant="secondary" className="text-xs px-1.5 py-0">
-                  {tag.name}
+          {/* Title Row */}
+          <div className="flex items-start gap-4">
+            <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-muted to-muted/50 border shrink-0">
+              {getContentTypeIcon()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight mb-2">{content.title}</h1>
+              <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                <Badge variant="secondary" className="font-medium">
+                  {content.source.name}
                 </Badge>
-              ))}
+                <Badge className={`${statusColors[content.status]} font-medium`}>
+                  {content.status}
+                </Badge>
+                {content.status === "FAILED" && (
+                  <span className="text-red-400 text-sm">(See details below)</span>
+                )}
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4" />
+                  {format(new Date(content.publishedAt), "MMMM d, yyyy")}
+                </span>
+                {content.transcript && (
+                  <span className="flex items-center gap-1.5">
+                    <FileText className="h-4 w-4" />
+                    {content.transcript.wordCount.toLocaleString()} words
+                  </span>
+                )}
+                {content.transcript?.source && (
+                  <Badge variant="outline" className={getTranscriptSourceColor(content.transcript.source)}>
+                    {getTranscriptSourceLabel(content.transcript.source)}
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Meta Tags Row */}
+          {content.tags.length > 0 && (
+            <div className="flex items-center gap-3 mt-4 pt-4 border-t">
+              <div className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
+                <Tag className="h-4 w-4" />
+                Meta Tags:
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {content.tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="secondary"
+                    className="cursor-pointer hover:bg-primary/20 transition-colors"
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -457,14 +477,17 @@ export default function ContentDetailPage({
       )}
 
       {/* Main Content - 1/3 + 2/3 Layout */}
-      <div className="flex flex-col lg:flex-row gap-4 p-4">
+      <div className="flex flex-col lg:flex-row gap-6 p-6">
         {/* Left: Transcript (1/3 width) */}
         <div className="lg:w-1/3 shrink-0">
-          <Card className="h-[calc(100vh-180px)] flex flex-col">
-            <CardHeader className="py-2 px-3 border-b shrink-0">
-              <CardTitle className="text-sm font-medium">Transcript</CardTitle>
+          <Card className="h-[calc(100vh-280px)] flex flex-col overflow-hidden">
+            <CardHeader className="py-3 px-4 border-b shrink-0 bg-muted/30">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+                Transcript
+              </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 p-0 overflow-hidden">
+            <CardContent className="flex-1 p-0 overflow-auto">
               {content.transcript ? (
                 <TranscriptViewer
                   segments={content.transcript.segments}
@@ -518,12 +541,12 @@ export default function ContentDetailPage({
         </div>
 
         {/* Right: Analysis (2/3 width) */}
-        <div className="flex-1 space-y-4">
+        <div className="flex-1 space-y-6">
           {/* Analysis Status Panel - shown when analyzing */}
           {(isAnalyzing || analysisError) && (
             <Card className="border-primary/30 bg-primary/5">
-              <CardHeader className="py-2 px-3">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <CardHeader className="py-3 px-4">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
                   {isAnalyzing ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -537,7 +560,7 @@ export default function ContentDetailPage({
                   ) : null}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="py-2 px-3 space-y-3">
+              <CardContent className="py-3 px-4 space-y-3">
                 {isAnalyzing && (
                   <>
                     <Progress value={analysisProgress} className="h-1.5" />
@@ -585,7 +608,7 @@ export default function ContentDetailPage({
           )}
 
           {/* Analysis Results */}
-          <div className="h-[calc(100vh-180px-${(isAnalyzing || analysisError) ? '140px' : '0px'})]">
+          <div>
             <AnalysisDisplay
               analyses={content.analyses}
               onReanalyze={handleAnalyze}
@@ -595,23 +618,23 @@ export default function ContentDetailPage({
           {/* Usage History */}
           {content.usageHistory.length > 0 && (
             <Card>
-              <CardHeader className="py-2 px-3">
-                <CardTitle className="text-sm font-medium">Usage History</CardTitle>
+              <CardHeader className="py-3 px-4 border-b bg-muted/30">
+                <CardTitle className="text-base font-semibold">Usage History</CardTitle>
               </CardHeader>
-              <CardContent className="py-2 px-3">
-                <div className="space-y-1.5">
+              <CardContent className="py-4 px-4">
+                <div className="space-y-2">
                   {content.usageHistory.map((usage) => (
                     <div
                       key={usage.id}
-                      className="flex items-center justify-between p-2 rounded border text-sm"
+                      className="flex items-center justify-between p-3 rounded-lg border bg-muted/20"
                     >
                       <div>
-                        <p className="font-medium text-sm">{usage.destination}</p>
+                        <p className="font-medium">{usage.destination}</p>
                         {usage.notes && (
-                          <p className="text-xs text-muted-foreground">{usage.notes}</p>
+                          <p className="text-sm text-muted-foreground mt-0.5">{usage.notes}</p>
                         )}
                       </div>
-                      <span className="text-xs text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         {format(new Date(usage.usedAt), "MMM d, yyyy")}
                       </span>
                     </div>
