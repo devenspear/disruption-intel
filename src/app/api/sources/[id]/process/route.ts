@@ -6,7 +6,7 @@ import { getChannelVideos } from "@/lib/ingestion/youtube"
 import { fetchTranscript } from "@/lib/ingestion/transcript"
 import { getLatestEpisodes } from "@/lib/ingestion/podcast"
 import { getLatestArticles } from "@/lib/ingestion/rss-article"
-import { fetchTweetsFromSource } from "@/lib/ingestion/twitter"
+import { fetchTweetsFromSource, fetchArticleContent } from "@/lib/ingestion/twitter"
 import { inngest } from "@/inngest/client"
 import { Prisma } from "@prisma/client"
 
@@ -115,21 +115,49 @@ export async function POST(
         })
 
         if (!existing) {
-          // Build full tweet text including quoted tweets
+          // Build full tweet text including article content and quoted tweets
           let fullTweetText = tweet.text
+
+          // If tweet has an article (Twitter Article/Long Post), try to fetch full content
+          if (tweet.article) {
+            let articleContent = tweet.article.previewText // Start with preview
+
+            // Try to fetch full article content if we have the URL
+            if (tweet.article.articleUrl) {
+              try {
+                const fullContent = await fetchArticleContent(tweet.article.articleUrl)
+                if (fullContent && fullContent.length > articleContent.length) {
+                  articleContent = fullContent
+                }
+              } catch {
+                // Fall back to preview text
+              }
+            }
+
+            fullTweetText = `# ${tweet.article.title}\n\n${articleContent}`
+          }
+
           if (tweet.quotedTweet?.text) {
             fullTweetText += `\n\n[Quoted @${tweet.quotedTweet.author}]: ${tweet.quotedTweet.text}`
           }
+
+          // Determine title - use article title if available
+          const title = tweet.article
+            ? tweet.article.title
+            : `@${tweet.author.userName}: ${tweet.text.slice(0, 100)}${tweet.text.length > 100 ? '...' : ''}`
+
+          // Use article cover image or author profile image as thumbnail
+          const thumbnailUrl = tweet.article?.coverImageUrl || tweet.author.profileImageUrl
 
           // Create content record for tweet with correct contentType
           const content = await prisma.content.create({
             data: {
               sourceId: source.id,
               externalId: tweet.id,
-              title: `@${tweet.author.userName}: ${tweet.text.slice(0, 100)}${tweet.text.length > 100 ? '...' : ''}`,
-              description: tweet.text,
+              title,
+              description: tweet.article ? tweet.article.previewText : tweet.text,
               publishedAt: tweet.createdAt,
-              thumbnailUrl: tweet.author.profileImageUrl,
+              thumbnailUrl,
               originalUrl: tweet.url,
               contentType: "SOCIAL_POST",
               status: "PENDING",
@@ -142,6 +170,7 @@ export async function POST(
                 isReply: tweet.isReply,
                 quotedTweet: tweet.quotedTweet,
                 media: tweet.media,
+                article: tweet.article,
                 tweetText: fullTweetText,
                 wordCount: fullTweetText.split(/\s+/).length,
               } as unknown as Prisma.InputJsonValue,

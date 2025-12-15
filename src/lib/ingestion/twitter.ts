@@ -6,8 +6,86 @@
  */
 
 import { logger } from '@/lib/logger'
+import * as cheerio from 'cheerio'
 
 const TWITTER_API_BASE = 'https://api.twitterapi.io/twitter'
+
+/**
+ * Fetch full article content from a Twitter Article URL
+ * Twitter Articles are long-form posts stored at URLs like:
+ * https://x.com/i/article/2000566143803686919
+ */
+export async function fetchArticleContent(articleUrl: string): Promise<string | null> {
+  try {
+    logger.info('twitter', 'fetchArticleContent', `Fetching article from ${articleUrl}`)
+
+    const response = await fetch(articleUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; DisruptionRadar/1.0)',
+        'Accept': 'text/html,application/xhtml+xml',
+      },
+    })
+
+    if (!response.ok) {
+      logger.warn('twitter', 'fetchArticleContent', `Failed to fetch article: ${response.status}`)
+      return null
+    }
+
+    const html = await response.text()
+    const $ = cheerio.load(html)
+
+    // Try to extract article content from various selectors
+    // Twitter Articles typically have content in article tags or specific data attributes
+    let content = ''
+
+    // Try article tag
+    const articleTag = $('article').text().trim()
+    if (articleTag && articleTag.length > 100) {
+      content = articleTag
+    }
+
+    // Try main content area
+    if (!content) {
+      const mainContent = $('[data-testid="tweetText"]').text().trim()
+      if (mainContent && mainContent.length > 100) {
+        content = mainContent
+      }
+    }
+
+    // Try extracting from script tags with JSON data
+    if (!content) {
+      $('script').each((_, el) => {
+        const scriptContent = $(el).html() || ''
+        if (scriptContent.includes('"article_results"') || scriptContent.includes('"body_text"')) {
+          try {
+            // Try to extract JSON and find article body
+            // Use [\s\S] instead of 's' flag for multiline matching
+            const jsonMatch = scriptContent.match(/\{[\s\S]*"body_text"[\s\S]*\}/)
+            if (jsonMatch) {
+              const data = JSON.parse(jsonMatch[0])
+              if (data.body_text) {
+                content = data.body_text
+              }
+            }
+          } catch {
+            // JSON parsing failed, continue
+          }
+        }
+      })
+    }
+
+    if (content && content.length > 100) {
+      logger.info('twitter', 'fetchArticleContent', `Fetched article content: ${content.length} chars`)
+      return content
+    }
+
+    logger.warn('twitter', 'fetchArticleContent', 'Could not extract article content')
+    return null
+  } catch (error) {
+    logger.error('twitter', 'fetchArticleContent', `Error fetching article: ${error}`)
+    return null
+  }
+}
 
 export interface Tweet {
   id: string
@@ -37,6 +115,12 @@ export interface Tweet {
     type: string
     url: string
   }>
+  article?: {
+    title: string
+    previewText: string
+    articleUrl?: string
+    coverImageUrl?: string
+  }
 }
 
 export interface TwitterUser {
@@ -84,6 +168,13 @@ interface RawTweet {
     title: string
     preview_text: string
     cover_media_img_url?: string
+  }
+  entities?: {
+    urls?: Array<{
+      display_url: string
+      expanded_url: string
+      url: string
+    }>
   }
 }
 
@@ -150,6 +241,23 @@ function parseTweet(rawTweet: RawTweet): Tweet {
   // Check if this is a retweet by looking at retweeted_tweet field
   const isRetweet = rawTweet.isRetweet || !!rawTweet.retweeted_tweet
 
+  // Extract article URL from entities if present
+  let articleUrl: string | undefined
+  if (rawTweet.entities?.urls) {
+    const articleUrlEntity = rawTweet.entities.urls.find(
+      u => u.expanded_url?.includes('/article/') || u.display_url?.includes('/article/')
+    )
+    articleUrl = articleUrlEntity?.expanded_url
+  }
+
+  // Parse article content if present
+  const article = rawTweet.article ? {
+    title: rawTweet.article.title,
+    previewText: rawTweet.article.preview_text,
+    articleUrl,
+    coverImageUrl: rawTweet.article.cover_media_img_url,
+  } : undefined
+
   return {
     id: rawTweet.id,
     text: rawTweet.text,
@@ -175,6 +283,7 @@ function parseTweet(rawTweet: RawTweet): Tweet {
       author: rawTweet.quoted_tweet.author?.userName || '',
     } : undefined,
     media: rawTweet.media,
+    article,
   }
 }
 
