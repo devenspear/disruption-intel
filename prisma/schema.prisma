@@ -32,6 +32,7 @@ enum ContentType {
   PODCAST_EPISODE
   ARTICLE
   SOCIAL_POST
+  TWITTER_ARTICLE
 }
 
 // NextAuth models

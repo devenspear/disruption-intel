@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db"
 import { fetchTranscript } from "@/lib/ingestion/transcript"
 import { getLatestEpisodes, type PodcastEpisode } from "@/lib/ingestion/podcast"
 import { getLatestArticles, type RSSArticle } from "@/lib/ingestion/rss-article"
-import { fetchTweetsFromSource, type Tweet } from "@/lib/ingestion/twitter"
+import { fetchTweetsFromSource, fetchArticleContent, type Tweet } from "@/lib/ingestion/twitter"
 import { acquireTranscript } from "@/lib/ingestion/transcript-strategies"
 import { logger } from "@/lib/logger"
 
@@ -299,18 +299,24 @@ export const checkSource = inngest.createFunction(
         })
 
         if (!existing) {
+          // Determine if this is a Twitter Article (long-form post)
+          const isArticle = !!tweet.article
+          const title = isArticle && tweet.article?.title
+            ? tweet.article.title
+            : `@${tweet.author.userName}: ${tweet.text.slice(0, 100)}${tweet.text.length > 100 ? '...' : ''}`
+
           // Create new content entry for tweet
           const content = await step.run(`create-content-${tweet.id}`, async () => {
             return prisma.content.create({
               data: {
                 sourceId: source.id,
                 externalId: tweet.id,
-                title: `@${tweet.author.userName}: ${tweet.text.slice(0, 100)}${tweet.text.length > 100 ? '...' : ''}`,
+                title,
                 description: tweet.text,
                 publishedAt: tweet.createdAt,
-                thumbnailUrl: tweet.author.profileImageUrl,
+                thumbnailUrl: tweet.article?.coverImageUrl || tweet.author.profileImageUrl,
                 originalUrl: tweet.url,
-                contentType: "SOCIAL_POST",
+                contentType: isArticle ? "TWITTER_ARTICLE" : "SOCIAL_POST",
                 metadata: {
                   author: tweet.author.userName,
                   authorName: tweet.author.name,
@@ -322,6 +328,13 @@ export const checkSource = inngest.createFunction(
                   // Store tweet text for transcript creation
                   tweetText: tweet.text,
                   wordCount: tweet.text.split(/\s+/).length,
+                  // Store article info if present (for long-form posts)
+                  article: tweet.article ? {
+                    title: tweet.article.title,
+                    previewText: tweet.article.previewText,
+                    articleUrl: tweet.article.articleUrl,
+                    coverImageUrl: tweet.article.coverImageUrl,
+                  } : undefined,
                 },
                 status: "PENDING",
               },
@@ -392,8 +405,110 @@ export const processContent = inngest.createFunction(
     const isPodcast = content.contentType === "PODCAST_EPISODE" || content.source.type === "PODCAST"
     const isArticle = content.contentType === "ARTICLE" || content.source.type === "RSS" || content.source.type === "SUBSTACK"
     const isTweet = content.contentType === "SOCIAL_POST" || content.source.type === "TWITTER"
+    const isTwitterArticle = content.contentType === "TWITTER_ARTICLE"
 
-    // For tweets, the tweet text serves as the "transcript"
+    // For Twitter Articles (long-form posts), fetch the full article content
+    if (isTwitterArticle) {
+      logger.info("inngest", "process-content.twitter-article.start", `Processing Twitter Article: ${content.title}`, {
+        contentId: content.id,
+      })
+
+      const metadata = content.metadata as {
+        tweetText?: string
+        author?: string
+        quotedTweet?: { text?: string }
+        article?: {
+          title?: string
+          previewText?: string
+          articleUrl?: string
+          coverImageUrl?: string
+        }
+      } | null
+
+      // Try to fetch full article content
+      let fullText = ""
+      let source = "tweet_content"
+
+      if (metadata?.article?.articleUrl) {
+        logger.info("inngest", "process-content.twitter-article.fetching", `Fetching article from: ${metadata.article.articleUrl}`, {
+          contentId: content.id,
+        })
+
+        const articleContent = await step.run("fetch-article-content", async () => {
+          return fetchArticleContent(metadata.article!.articleUrl!)
+        })
+
+        if (articleContent && articleContent.length > 100) {
+          fullText = articleContent
+          source = "twitter_article"
+          logger.info("inngest", "process-content.twitter-article.fetched", `Got article content: ${articleContent.length} chars`, {
+            contentId: content.id,
+          })
+        }
+      }
+
+      // Fallback to tweet text + preview if article fetch failed
+      if (!fullText) {
+        fullText = metadata?.article?.previewText || metadata?.tweetText || ""
+        if (metadata?.quotedTweet?.text) {
+          fullText += `\n\n[Quoted tweet]: ${metadata.quotedTweet.text}`
+        }
+        logger.info("inngest", "process-content.twitter-article.fallback", `Using fallback text: ${fullText.length} chars`, {
+          contentId: content.id,
+        })
+      }
+
+      if (fullText) {
+        const wordCount = fullText.split(/\s+/).length
+
+        // Save content as transcript
+        await step.run("save-twitter-article-transcript", async () => {
+          return prisma.transcript.create({
+            data: {
+              contentId: content.id,
+              fullText,
+              segments: [],
+              language: "en",
+              source,
+              wordCount,
+            },
+          })
+        })
+
+        // Trigger AI analysis
+        await step.sendEvent("trigger-analysis", {
+          name: "content/analyze",
+          data: { contentId: content.id },
+        })
+
+        logger.info("inngest", "process-content.twitter-article.success", `Twitter Article saved as transcript`, {
+          contentId: content.id,
+          metadata: { wordCount, source, author: metadata?.author },
+        })
+
+        return {
+          transcriptFetched: true,
+          source,
+          wordCount,
+        }
+      } else {
+        // No content available
+        await step.run("update-status-failed", async () => {
+          return prisma.content.update({
+            where: { id: contentId },
+            data: { status: "FAILED" },
+          })
+        })
+
+        logger.error("inngest", "process-content.twitter-article.no-content", `No article content available`, {
+          contentId: content.id,
+        })
+
+        return { transcriptFetched: false, reason: "No article content" }
+      }
+    }
+
+    // For regular tweets, the tweet text serves as the "transcript"
     if (isTweet) {
       logger.info("inngest", "process-content.tweet.start", `Processing tweet: ${content.title}`, {
         contentId: content.id,
