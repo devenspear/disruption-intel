@@ -101,15 +101,13 @@ export default function DashboardPage() {
     : 0
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 border-b">
-        <div className="py-4">
-          <h1 className="text-2xl font-bold">Dashboard</h1>
-          <p className="text-muted-foreground text-sm">
-            Disruption Intelligence Engine Overview
-          </p>
-        </div>
+    <div className="flex flex-col h-full w-full max-w-full">
+      {/* Header */}
+      <div className="pb-4">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground text-sm">
+          Disruption Intelligence Engine Overview
+        </p>
       </div>
 
       {/* Scrollable Content */}

@@ -47,7 +47,7 @@ export function Sidebar() {
   const pathname = usePathname()
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card">
+    <div className="flex h-full w-64 flex-shrink-0 flex-col border-r bg-card">
       {/* Enhanced Header */}
       <div className="flex h-20 items-center border-b px-6">
         <Link href="/" className="flex items-center gap-3 group">

@@ -344,11 +344,12 @@ export function ContentTable({
   }
 
   return (
-    <div className="max-h-[calc(100vh-280px)] overflow-auto relative">
-      <table
-        className="w-full caption-bottom text-sm"
-        style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 0) }}
-      >
+    <div className="w-full max-w-full overflow-x-auto">
+      <div className="max-h-[calc(100vh-280px)] overflow-y-auto relative">
+        <table
+          className="w-full caption-bottom text-sm"
+          style={{ minWidth: Object.values(columnWidths).reduce((a, b) => a + b, 0) }}
+        >
         <thead className="sticky top-0 z-10 bg-background shadow-sm [&_tr]:border-b">
           <TableRow className="hover:bg-transparent border-b">
             <TableHead style={{ width: columnWidths.checkbox }} className="relative">
@@ -547,7 +548,8 @@ export function ContentTable({
             )
           })}
         </tbody>
-      </table>
+        </table>
+      </div>
     </div>
   )
 }

@@ -174,17 +174,15 @@ export default function SourcesPage() {
     : sources
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-20 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 pb-4 -mx-8 px-8 border-b">
-        <div className="flex items-center justify-between py-4">
-          <div className="flex items-center gap-6">
-            <div>
-              <h1 className="text-3xl font-bold">Sources</h1>
-              <p className="text-muted-foreground">
-                Manage your content sources for monitoring
-              </p>
-            </div>
+    <div className="flex flex-col h-full w-full max-w-full">
+      {/* Header */}
+      <div className="pb-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Sources</h1>
+            <p className="text-muted-foreground">
+              Manage your content sources for monitoring
+            </p>
           </div>
           <Button
             variant={sortByType ? "secondary" : "outline"}
@@ -197,9 +195,7 @@ export default function SourcesPage() {
         </div>
 
         {/* Inline Add Source - Below Header */}
-        <div className="pt-2">
-          <AddSourceInline onAdd={handleAddSource} />
-        </div>
+        <AddSourceInline onAdd={handleAddSource} />
       </div>
 
       {/* Scrollable Content */}
