@@ -36,6 +36,7 @@ function ContentPageContent() {
     sourceType: searchParams.get("sourceType") || "all",
     sortBy: searchParams.get("sortBy") || "publishedAt",
     sortOrder: (searchParams.get("sortOrder") || "desc") as "asc" | "desc",
+    tags: searchParams.get("tags") || "",
   })
 
   const fetchContent = useCallback(async (pageNum: number, append: boolean = false) => {
@@ -51,6 +52,7 @@ function ContentPageContent() {
       if (filters.status !== "all") params.set("status", filters.status)
       if (filters.sourceId !== "all") params.set("sourceId", filters.sourceId)
       if (filters.sourceType !== "all") params.set("sourceType", filters.sourceType)
+      if (filters.tags) params.set("tags", filters.tags)
       params.set("sortBy", filters.sortBy)
       params.set("sortOrder", filters.sortOrder)
       params.set("page", pageNum.toString())
@@ -169,6 +171,7 @@ function ContentPageContent() {
       sourceType: "all",
       sortBy: "publishedAt",
       sortOrder: "desc",
+      tags: "",
     })
     setSelectedIds(new Set())
     router.push("/content")

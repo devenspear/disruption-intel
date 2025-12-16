@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import OpenAI from "openai"
 import { logger } from "@/lib/logger"
+import { getSystemPrompt } from "@/lib/prompts"
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -238,6 +239,10 @@ export async function analyzeWithOpenAI(
 }
 
 export async function generateSummary(text: string, maxWords: number = 100): Promise<string> {
+  // Fetch prompt from database and replace placeholder
+  const promptTemplate = await getSystemPrompt("simple_summary")
+  const userPrompt = promptTemplate.replace("{{maxWords}}", String(maxWords)) + `\n\nTEXT:\n${text}`
+
   try {
     const message = await withTimeout(
       anthropic.messages.create({
@@ -246,7 +251,7 @@ export async function generateSummary(text: string, maxWords: number = 100): Pro
         messages: [
           {
             role: "user",
-            content: `Summarize the following text in ${maxWords} words or less. Focus on the key points and main takeaways.\n\nTEXT:\n${text}`,
+            content: userPrompt,
           },
         ],
       }),
@@ -262,7 +267,7 @@ export async function generateSummary(text: string, maxWords: number = 100): Pro
       messages: [
         {
           role: "user",
-          content: `Summarize the following text in ${maxWords} words or less. Focus on the key points and main takeaways.\n\nTEXT:\n${text}`,
+          content: userPrompt,
         },
       ],
     })
@@ -271,6 +276,10 @@ export async function generateSummary(text: string, maxWords: number = 100): Pro
 }
 
 export async function suggestTags(text: string): Promise<string[]> {
+  // Fetch prompt from database
+  const promptTemplate = await getSystemPrompt("tag_suggestion")
+  const userPrompt = promptTemplate + `\n\nTEXT:\n${text.substring(0, 5000)}`
+
   try {
     const message = await withTimeout(
       anthropic.messages.create({
@@ -279,7 +288,7 @@ export async function suggestTags(text: string): Promise<string[]> {
         messages: [
           {
             role: "user",
-            content: `Based on the following text, suggest 3-5 relevant tags/categories. Return only the tags as a JSON array of strings.\n\nTEXT:\n${text.substring(0, 5000)}`,
+            content: userPrompt,
           },
         ],
       }),

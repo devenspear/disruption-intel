@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { prisma } from "@/lib/db"
 import { authOptions } from "@/lib/auth"
+import { getSystemPrompt } from "@/lib/prompts"
 import Anthropic from "@anthropic-ai/sdk"
 
 const anthropic = new Anthropic({
@@ -130,28 +131,15 @@ export async function POST(request: Request) {
     }
   })
 
-  const prompt = `You are an executive intelligence analyst. Below are ${analyses.length} individual content analyses from the past ${days} days covering AI, technology, and disruption topics.
+  // Fetch the executive briefing prompt from database
+  const briefingPromptTemplate = await getSystemPrompt("executive_briefing")
 
-Your task is to synthesize these into a cohesive EXECUTIVE BRIEFING that:
-1. Identifies the top 5-7 macro trends and themes emerging across all content
-2. Highlights the most significant developments and their implications
-3. Notes key companies and technologies that are recurring themes
-4. Provides actionable strategic insights
-5. Flags any important shifts or emerging patterns
+  const prompt = `${briefingPromptTemplate}
 
-Format your response as a structured JSON object with:
-- executiveSummary: 2-3 paragraph overview (string)
-- macroTrends: array of { trend: string, evidence: string, implication: string }
-- keyDevelopments: array of { development: string, significance: string }
-- companiesInFocus: array of { name: string, context: string }
-- technologiesInFocus: array of { name: string, context: string }
-- strategicInsights: array of strings (actionable recommendations)
-- emergingPatterns: array of strings (early signals to watch)
+Below are ${analyses.length} individual content analyses from the past ${days} days:
 
 INDIVIDUAL ANALYSES:
-${JSON.stringify(analysisData, null, 2)}
-
-Respond ONLY with valid JSON, no markdown.`
+${JSON.stringify(analysisData, null, 2)}`
 
   try {
     const response = await anthropic.messages.create({

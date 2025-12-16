@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const sourceId = searchParams.get("sourceId")
   const sourceType = searchParams.get("sourceType")
   const search = searchParams.get("search")
+  const tags = searchParams.get("tags") // Comma-separated tag names
   const sortBy = searchParams.get("sortBy") || "publishedAt"
   const sortOrderParam = searchParams.get("sortOrder") || "desc"
   // Ensure sortOrder is a valid Prisma sort order
@@ -41,6 +42,20 @@ export async function GET(request: Request) {
       { title: { contains: search, mode: "insensitive" } },
       { description: { contains: search, mode: "insensitive" } },
     ]
+  }
+
+  // Filter by tags (content must have ALL specified tags)
+  if (tags) {
+    const tagNames = tags.split(",").map(t => t.trim()).filter(Boolean)
+    if (tagNames.length > 0) {
+      where.AND = tagNames.map(tagName => ({
+        tags: {
+          some: {
+            name: { equals: tagName, mode: "insensitive" },
+          },
+        },
+      }))
+    }
   }
 
   // Build orderBy clause based on sortBy field
@@ -96,6 +111,10 @@ export async function GET(request: Request) {
           select: { relevanceScore: true },
           take: 1,
           orderBy: { createdAt: "desc" },
+        },
+        tags: {
+          select: { id: true, name: true, color: true },
+          orderBy: { name: "asc" },
         },
         _count: {
           select: { tags: true, usageHistory: true },

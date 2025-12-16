@@ -59,8 +59,15 @@ Dual-provider AI analysis with automatic fallback:
 - Sortable columns with asc/desc ordering
 - Content type icons (Video/Podcast/Article/Tweet)
 - Transcript source badges (YouTube, RSS, Scraped, etc.)
-- Filtering by status, source type, and search
+- Filtering by status, source type, search, and **tags**
+- Tag-based filtering with multi-select dropdown
 - Infinite scroll pagination
+
+### AI-Generated Tags
+- Automatic category extraction during content analysis
+- Categories are saved as searchable tags in the database
+- Tag filter in Content Library for easy content discovery
+- Tags displayed on content cards and detail views
 
 ### Dashboard
 - Real-time stats: Total Content, Analyzed, Processing, Pending
@@ -81,8 +88,10 @@ Dual-provider AI analysis with automatic fallback:
 - **Database Overview** - Live view of all database tables and record counts
 - **Data Management** - Configure retention period (7-90 days)
 - **Purge Controls** - Preview and execute purge of old transcripts/logs
-- **Analysis Prompts** - Customize AI analysis instructions
+- **Analysis Prompts** - Customize AI analysis instructions (tabbed interface)
+- **System Prompts** - Edit Executive Briefing, Summary, and Tag Suggestion prompts
 - **System Logs** - View application activity and errors
+- **Inngest Dashboard** - Background job monitoring with links to Inngest Cloud
 
 ## Tech Stack
 
@@ -281,12 +290,13 @@ Content →
 | `npm run version:patch` | Bump patch version |
 | `npm run version:minor` | Bump minor version |
 | `npx tsx scripts/seed-podcasts.ts` | Import podcast sources |
+| `npx tsx scripts/seed-system-prompts.ts` | Seed system prompts (briefing, summary, tags) |
 | `npx tsx scripts/discover-podcast-feeds.ts` | Discover RSS feeds from URLs |
 
 ## API Endpoints
 
 ### Content
-- `GET /api/content` - List content with filtering (Type, Title, Source, Status, Words, Score, Published)
+- `GET /api/content` - List content with filtering (Type, Title, Source, Status, Words, Score, Published, Tags)
 - `GET /api/content/[id]` - Get content details with transcript and analysis
 - `POST /api/content/[id]/analyze` - Trigger AI analysis
 - `GET /api/content/[id]/transcript` - Get transcript details
@@ -308,6 +318,14 @@ Content →
 - `GET /api/logs` - View application logs
 - `GET /api/settings` - Get system settings
 - `PUT /api/settings` - Update a system setting
+
+### System Prompts
+- `GET /api/system-prompts` - List all system prompts (briefing, summary, tags)
+- `GET /api/system-prompts/[id]` - Get a specific system prompt
+- `PATCH /api/system-prompts/[id]` - Update a system prompt
+
+### Tags
+- `GET /api/tags` - List all tags with content counts
 
 ### Executive Briefing
 - `GET /api/briefings` - Get latest executive briefing

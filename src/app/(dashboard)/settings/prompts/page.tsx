@@ -15,7 +15,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   DropdownMenu,
@@ -23,7 +22,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Plus, MoreVertical, Star, Trash2, Edit, Copy } from "lucide-react"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs"
+import { Plus, MoreVertical, Star, Trash2, Edit, Copy, Settings2, Brain, Info } from "lucide-react"
 import { toast } from "sonner"
 import { formatDistanceToNow } from "date-fns"
 
@@ -41,16 +46,36 @@ interface Prompt {
   }
 }
 
+interface SystemPrompt {
+  id: string
+  key: string
+  name: string
+  description: string | null
+  prompt: string
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
 export default function PromptsPage() {
   const [prompts, setPrompts] = useState<Prompt[]>([])
+  const [systemPrompts, setSystemPrompts] = useState<SystemPrompt[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [isLoadingSystem, setIsLoadingSystem] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [systemDialogOpen, setSystemDialogOpen] = useState(false)
   const [editingPrompt, setEditingPrompt] = useState<Prompt | null>(null)
+  const [editingSystemPrompt, setEditingSystemPrompt] = useState<SystemPrompt | null>(null)
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     systemPrompt: "",
     isDefault: false,
+  })
+  const [systemFormData, setSystemFormData] = useState({
+    name: "",
+    description: "",
+    prompt: "",
   })
 
   const fetchPrompts = async () => {
@@ -68,8 +93,24 @@ export default function PromptsPage() {
     }
   }
 
+  const fetchSystemPrompts = async () => {
+    try {
+      const res = await fetch("/api/system-prompts")
+      if (res.ok) {
+        const data = await res.json()
+        setSystemPrompts(data)
+      }
+    } catch (error) {
+      console.error("Failed to fetch system prompts:", error)
+      toast.error("Failed to load system prompts")
+    } finally {
+      setIsLoadingSystem(false)
+    }
+  }
+
   useEffect(() => {
     fetchPrompts()
+    fetchSystemPrompts()
   }, [])
 
   const handleOpenDialog = (prompt?: Prompt) => {
@@ -159,102 +200,254 @@ export default function PromptsPage() {
     setDialogOpen(true)
   }
 
+  // System prompt handlers
+  const handleOpenSystemDialog = (prompt: SystemPrompt) => {
+    setEditingSystemPrompt(prompt)
+    setSystemFormData({
+      name: prompt.name,
+      description: prompt.description || "",
+      prompt: prompt.prompt,
+    })
+    setSystemDialogOpen(true)
+  }
+
+  const handleSystemSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!editingSystemPrompt) return
+
+    const res = await fetch(`/api/system-prompts/${editingSystemPrompt.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(systemFormData),
+    })
+
+    if (res.ok) {
+      toast.success("System prompt updated")
+      setSystemDialogOpen(false)
+      fetchSystemPrompts()
+    } else {
+      const data = await res.json()
+      toast.error(data.error || "Failed to save prompt")
+    }
+  }
+
+  // Get icon for system prompt by key
+  const getSystemPromptIcon = (key: string) => {
+    switch (key) {
+      case "executive_briefing":
+        return "📊"
+      case "simple_summary":
+        return "📝"
+      case "tag_suggestion":
+        return "🏷️"
+      default:
+        return "⚙️"
+    }
+  }
+
+  // Get description of where the prompt is used
+  const getSystemPromptUsage = (key: string) => {
+    switch (key) {
+      case "executive_briefing":
+        return "Used in: Dashboard → Generate Briefing"
+      case "simple_summary":
+        return "Used in: Quick summaries of content"
+      case "tag_suggestion":
+        return "Used in: Auto-suggesting tags for content"
+      default:
+        return "System utility prompt"
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Analysis Prompts</h1>
-          <p className="text-muted-foreground">
-            Manage prompts for AI-powered content analysis
-          </p>
-        </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Prompt
-        </Button>
+      <div>
+        <h1 className="text-3xl font-bold">AI Prompts</h1>
+        <p className="text-muted-foreground">
+          Manage prompts for AI-powered content analysis and system operations
+        </p>
       </div>
 
-      {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} className="h-48" />
-          ))}
-        </div>
-      ) : prompts.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <p className="text-muted-foreground mb-4">No prompts yet</p>
+      <Tabs defaultValue="analysis" className="w-full">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="analysis" className="gap-2">
+            <Brain className="h-4 w-4" />
+            Content Analysis
+          </TabsTrigger>
+          <TabsTrigger value="system" className="gap-2">
+            <Settings2 className="h-4 w-4" />
+            System Prompts
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Content Analysis Prompts Tab */}
+        <TabsContent value="analysis" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Prompts used for analyzing content (transcripts, articles, tweets)
+            </p>
             <Button onClick={() => handleOpenDialog()}>
               <Plus className="mr-2 h-4 w-4" />
-              Create First Prompt
+              New Prompt
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {prompts.map((prompt) => (
-            <Card key={prompt.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <CardTitle className="text-lg">{prompt.name}</CardTitle>
-                      {prompt.isDefault && (
-                        <Badge variant="secondary">
-                          <Star className="mr-1 h-3 w-3" />
-                          Default
-                        </Badge>
-                      )}
-                    </div>
-                    <CardDescription>
-                      {prompt.description || "No description"}
-                    </CardDescription>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleOpenDialog(prompt)}>
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDuplicate(prompt)}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Duplicate
-                      </DropdownMenuItem>
-                      {!prompt.isDefault && (
-                        <DropdownMenuItem onClick={() => handleSetDefault(prompt.id)}>
-                          <Star className="mr-2 h-4 w-4" />
-                          Set as Default
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDelete(prompt.id)}
-                        disabled={prompt._count.analyses > 0}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center justify-between text-sm text-muted-foreground">
-                  <span>{prompt._count.analyses} analyses</span>
-                  <span>
-                    Updated {formatDistanceToNow(new Date(prompt.updatedAt))} ago
-                  </span>
-                </div>
+          </div>
+
+          {isLoading ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {[...Array(4)].map((_, i) => (
+                <Skeleton key={i} className="h-48" />
+              ))}
+            </div>
+          ) : prompts.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <p className="text-muted-foreground mb-4">No prompts yet</p>
+                <Button onClick={() => handleOpenDialog()}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create First Prompt
+                </Button>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      )}
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {prompts.map((prompt) => (
+                <Card key={prompt.id}>
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <CardTitle className="text-lg">{prompt.name}</CardTitle>
+                          {prompt.isDefault && (
+                            <Badge variant="secondary">
+                              <Star className="mr-1 h-3 w-3" />
+                              Default
+                            </Badge>
+                          )}
+                        </div>
+                        <CardDescription>
+                          {prompt.description || "No description"}
+                        </CardDescription>
+                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleOpenDialog(prompt)}>
+                            <Edit className="mr-2 h-4 w-4" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDuplicate(prompt)}>
+                            <Copy className="mr-2 h-4 w-4" />
+                            Duplicate
+                          </DropdownMenuItem>
+                          {!prompt.isDefault && (
+                            <DropdownMenuItem onClick={() => handleSetDefault(prompt.id)}>
+                              <Star className="mr-2 h-4 w-4" />
+                              Set as Default
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => handleDelete(prompt.id)}
+                            disabled={prompt._count.analyses > 0}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span>{prompt._count.analyses} analyses</span>
+                      <span>
+                        Updated {formatDistanceToNow(new Date(prompt.updatedAt))} ago
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* System Prompts Tab */}
+        <TabsContent value="system" className="space-y-4 mt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-muted-foreground">
+              Prompts used for briefings, summaries, and tag suggestions
+            </p>
+          </div>
+
+          {/* How It Works - Generate Briefing */}
+          <Card className="bg-blue-500/5 border-blue-500/20">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Info className="h-5 w-5 text-blue-500" />
+                How Generate Briefing Works
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              <p>
+                The <strong className="text-foreground">Executive Briefing</strong> feature synthesizes multiple content analyses into a single strategic report. Here&apos;s what happens when you click &quot;Generate Briefing&quot;:
+              </p>
+              <ol className="list-decimal list-inside space-y-2 ml-2">
+                <li><strong className="text-foreground">Data Collection:</strong> Fetches the top 50 analyses from your selected time period (7, 14, 30, 60, or 90 days), ordered by relevance score.</li>
+                <li><strong className="text-foreground">Data Extraction:</strong> For each analysis, extracts: title, source, published date, relevance score, summary, key insights, technologies, companies, and topics.</li>
+                <li><strong className="text-foreground">AI Synthesis:</strong> Sends all extracted data to Claude along with the &quot;Executive Briefing&quot; prompt below.</li>
+                <li><strong className="text-foreground">Structured Output:</strong> Claude returns a JSON object containing: executive summary, macro trends, key developments, companies/technologies in focus, strategic insights, and emerging patterns.</li>
+              </ol>
+              <p className="pt-2">
+                <strong className="text-foreground">Tip:</strong> Edit the Executive Briefing prompt below to customize what the AI focuses on and how it structures the output.
+              </p>
+            </CardContent>
+          </Card>
+
+          {isLoadingSystem ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-48" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {systemPrompts.map((prompt) => (
+                <Card key={prompt.id} className="hover:bg-accent/50 transition-colors">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{getSystemPromptIcon(prompt.key)}</span>
+                          <CardTitle className="text-lg">{prompt.name}</CardTitle>
+                        </div>
+                        <CardDescription>
+                          {prompt.description || "No description"}
+                        </CardDescription>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => handleOpenSystemDialog(prompt)}>
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-sm text-muted-foreground">
+                      <span className="text-xs">{getSystemPromptUsage(prompt.key)}</span>
+                      <span>
+                        Updated {formatDistanceToNow(new Date(prompt.updatedAt))} ago
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -316,6 +509,79 @@ export default function PromptsPage() {
               </Button>
               <Button type="submit">
                 {editingPrompt ? "Update" : "Create"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* System Prompt Edit Dialog */}
+      <Dialog open={systemDialogOpen} onOpenChange={setSystemDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {editingSystemPrompt && (
+                <span className="text-xl">{getSystemPromptIcon(editingSystemPrompt.key)}</span>
+              )}
+              Edit System Prompt
+            </DialogTitle>
+            <DialogDescription>
+              {editingSystemPrompt?.description || "Configure this system prompt"}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSystemSubmit}>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="sys-name">Name</Label>
+                <Input
+                  id="sys-name"
+                  value={systemFormData.name}
+                  onChange={(e) =>
+                    setSystemFormData({ ...systemFormData, name: e.target.value })
+                  }
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="sys-description">Description</Label>
+                <Input
+                  id="sys-description"
+                  value={systemFormData.description}
+                  onChange={(e) =>
+                    setSystemFormData({ ...systemFormData, description: e.target.value })
+                  }
+                  placeholder="Brief description of this prompt's purpose"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="sys-prompt">Prompt</Label>
+                <Textarea
+                  id="sys-prompt"
+                  value={systemFormData.prompt}
+                  onChange={(e) =>
+                    setSystemFormData({ ...systemFormData, prompt: e.target.value })
+                  }
+                  placeholder="Enter the prompt..."
+                  className="min-h-[300px] font-mono text-sm"
+                  required
+                />
+                {editingSystemPrompt?.key === "simple_summary" && (
+                  <p className="text-xs text-muted-foreground">
+                    Use <code className="bg-muted px-1 rounded">{"{{maxWords}}"}</code> as a placeholder for the word limit.
+                  </p>
+                )}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setSystemDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">
+                Update
               </Button>
             </DialogFooter>
           </form>

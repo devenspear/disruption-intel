@@ -255,7 +255,57 @@ Focus on:
       metadata: { analysisId: savedAnalysis.id },
     })
 
-    // Step 6: Update content status
+    // Step 6: Extract and save categories as searchable tags
+    const categories = (analysisResult.result as { categories?: string[] })?.categories || []
+    if (categories.length > 0) {
+      try {
+        await step.run("save-category-tags", async () => {
+          // Create tags if they don't exist and connect them to the content
+          const tagConnections = []
+          for (const categoryName of categories) {
+            // Normalize the category name
+            const normalizedName = categoryName.trim()
+            if (!normalizedName) continue
+
+            // Upsert the tag (create if not exists)
+            const tag = await prisma.tag.upsert({
+              where: { name: normalizedName },
+              update: {}, // No update needed, just ensure it exists
+              create: { name: normalizedName },
+            })
+            tagConnections.push({ id: tag.id })
+          }
+
+          // Connect tags to the content
+          if (tagConnections.length > 0) {
+            await prisma.content.update({
+              where: { id: contentId },
+              data: {
+                tags: {
+                  connect: tagConnections,
+                },
+              },
+            })
+          }
+
+          return { tagsCreated: tagConnections.length }
+        })
+
+        await logger.info("inngest", "step-complete", `Saved ${categories.length} category tags`, {
+          contentId,
+          metadata: { categories },
+        })
+      } catch (error) {
+        // Log but don't fail the analysis if tag saving fails
+        const msg = error instanceof Error ? error.message : "Unknown error"
+        await logger.warn("inngest", "step-warning", `save-category-tags failed: ${msg}`, {
+          contentId,
+          metadata: { error: msg },
+        })
+      }
+    }
+
+    // Step 7: Update content status
     try {
       await step.run("update-content-status", async () => {
         return prisma.content.update({
